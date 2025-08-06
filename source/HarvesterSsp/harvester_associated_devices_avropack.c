@@ -580,6 +580,7 @@ void harvester_report_associateddevices(struct associateddevicedata *head, char*
       else if ( strstr("_320MHz", ps->cli_OperatingChannelBandwidth) )
       {
           CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, operating_channel_bandwidth = \"%s\"\n", "set to _320MHz" ));
+          avro_value_set_enum(&optional, avro_schema_enum_get_by_name(avro_value_get_schema(&optional), "_320MHz"));
       }
       else
       {
