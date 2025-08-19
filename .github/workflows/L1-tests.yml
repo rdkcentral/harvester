@@ -19,11 +19,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install dependencies
-        run: |
-          apt-get update
-          apt-get install -y libavro-dev
-
       - name: Run unit tests
         run: sh -c source/test/run_ut.sh
 
