@@ -469,7 +469,7 @@ char * getDeviceMac()
 	char getList[256] = "Device.DPoE.Mac_address";
 	char* getList1[] = {"Device.DPoE.Mac_address"};
 #else
-#if defined (_HUB4_PRODUCT_REQ_) || defined(_SR300_PRODUCT_REQ_) || defined(_SCER11BEL_PRODUCT_REQ_)
+#if defined (_HUB4_PRODUCT_REQ_) || defined(_SR300_PRODUCT_REQ_) || defined(_SCER11BEL_PRODUCT_REQ_) || defined(_SCXF11BFL_PRODUCT_REQ_)
         char getList[256] = "Device.DeviceInfo.X_COMCAST-COM_WAN_MAC";
         char* getList1[] = {"Device.DeviceInfo.X_COMCAST-COM_WAN_MAC"};
 #else
