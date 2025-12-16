@@ -262,7 +262,6 @@ int rbus_GetValueFromDB( char* paramName, char** paramValue)
         if(str_value !=NULL)
         {
             *paramValue = strdup(str_value);
-            free(str_value);
             CcspHarvesterTrace(("RDK_LOG_DEBUG, %s: Requested param DB value [%s]\n", __FUNCTION__, *paramValue));
         }
         rbusObject_Release(outParams);
