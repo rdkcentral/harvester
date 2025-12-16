@@ -40,6 +40,7 @@
 #include <sysevent/sysevent.h>
 #ifdef RDK_ONEWIFI
 #include "harvester_rbus_api.h"
+#include "harvester_mlo.h"
 #endif
 
 #define PUBLIC  0
@@ -85,6 +86,9 @@ int GetWiFiApGetAssocDevicesData(int ServiceType, int wlanIndex, char* pSsid);
 
 static struct associateddevicedata *headnodeprivate = NULL;
 static struct associateddevicedata *headnodepublic = NULL;
+
+static struct mlo_associated_device_data *headnodeMLOprivate = NULL;
+static struct mlo_associated_device_data *headnodeMLOpublic = NULL;
 
 // RDKB-9258 : set polling and reporting periods to NVRAM after TTL expiry
 extern ANSC_STATUS SetIDWPollingPeriodInNVRAM(ULONG pPollingVal);
@@ -684,6 +688,40 @@ int GetWiFiApGetAssocDevicesData(int ServiceType, int wlanIndex, char* pSsid)
         CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Harvester %s : wifi_getApAssociatedDeviceDiagnosticResult Return[%d] array_size [%d] \n",__FUNCTION__, ret, array_size));
     } 
 
+#ifdef RDK_ONEWIFI
+    /* Poll MLO TR181 if RFC enabled */
+    /* Poll MLO TR181 if RFC enabled */
+    if (get_HarvesterMLORfcEnable())
+    {
+        CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, %s: MLO RFC Enabled, polling wlanIndex %d\n", __FUNCTION__, wlanIndex));
+        mlo_assoc_dev_t *mlo_dev_array = NULL;
+        uint32_t mlo_array_size = 0;
+        char *mloVapIndex = NULL;
+
+        int mloRet = rbus_getMloAssociatedDeviceDiagnosticResult(wlanIndex+1, &mlo_dev_array, &mlo_array_size, &mloVapIndex);
+        if (!mloRet && mlo_dev_array && mlo_array_size > 0)
+        {
+            CcspHarvesterTrace(("RDK_LOG_INFO, MLO devices found: %d for wlanIndex %d\n", mlo_array_size, wlanIndex));
+            struct mlo_associated_device_data **mloHeadnode = NULL;
+            if (ServiceType == PUBLIC)
+            {
+                mloHeadnode = &headnodeMLOpublic;
+            }
+            else
+            {
+                mloHeadnode = &headnodeMLOprivate;
+            }
+            add_to_mlo_list(mloHeadnode, mloVapIndex, mlo_array_size, mlo_dev_array);
+            print_mlo_list(*mloHeadnode);
+        }
+        else
+        {
+             CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, %s: No MLO devices found or error (ret=%d, count=%d)\n", __FUNCTION__, mloRet, mlo_array_size));
+        }
+        if (mloVapIndex) free(mloVapIndex);
+    }
+#endif
+
     CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Harvester %s EXIT \n", __FUNCTION__ ));
     return ret;
 }
@@ -830,6 +868,24 @@ void* StartAssociatedDeviceHarvesting( void *arg )
 
                 currentReportingPeriod = 0;
             }
+
+#ifdef RDK_ONEWIFI
+            /* MLO cleanup - just cleanup, no reporting yet */
+            if( headnodeMLOprivate )
+            {
+                CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Cleaning up MLO Private list\n"));
+                print_mlo_list( headnodeMLOprivate );
+                delete_mlo_list( headnodeMLOprivate );
+                headnodeMLOprivate = NULL;
+            }
+            if( headnodeMLOpublic )
+            {
+                CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Cleaning up MLO Public list\n"));
+                print_mlo_list( headnodeMLOpublic );
+                delete_mlo_list( headnodeMLOpublic );
+                headnodeMLOpublic = NULL;
+            }
+#endif
 
             if(!GetIDWOverrideTTL())
             {
