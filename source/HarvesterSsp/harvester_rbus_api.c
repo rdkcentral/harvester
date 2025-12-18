@@ -40,7 +40,6 @@
 #include "secure_wrapper.h"
 #include "harvester_rbus_api.h"
 #include <cJSON.h>
-#include "harvester_mlo.h"
 
 STATIC rbusHandle_t rbus_handle;
 
@@ -66,8 +65,6 @@ int harvesterRbusInit(const char *pComponentName)
         CcspHarvesterTrace(("RDK_LOG_ERROR, Harvester %s: failed with error code %d\n", __FUNCTION__, ret));
         return 1;
     }
-    // Calling MLO Rfc Init to register the get and set handlers
-    harvesterMLO_RfcInit();
 
     CcspHarvesterTrace(("RDK_LOG_INFO, Harvester %s: is success. ret is %d\n", __FUNCTION__, ret));
     return 0;
@@ -174,7 +171,7 @@ int rbus_getUInt32Value(ULONG * value, char * path)
 /**
  * To persist TR181 parameter values in PSM DB.
  */
-int rbus_StoreValueIntoDB(char *paramName, char *value)
+int rbus_StoreValueIntoPsmDB(char *paramName, char *value)
 {
     rbusHandle_t rbus_handle = get_rbus_handle();
     rbusObject_t inParams;
@@ -212,7 +209,7 @@ int rbus_StoreValueIntoDB(char *paramName, char *value)
 /**
  * To fetch TR181 parameter values from PSM DB.
  */
-int rbus_GetValueFromDB( char* paramName, char** paramValue)
+int rbus_GetValueFromPsmDB( char* paramName, char** paramValue)
 {
     rbusHandle_t rbus_handle = get_rbus_handle();
     rbusObject_t inParams;
@@ -557,39 +554,81 @@ int rbus_getMloAssociatedDeviceDiagnosticResult(int index, mlo_assoc_dev_t **mlo
     
     rc = rbus_get(rbus_handle, path, &mloDevVal);
 
+    char *mloDevDataStr = NULL;
+
     if(rc != RBUS_ERROR_SUCCESS)
     {
-        CcspHarvesterTrace(("RDK_LOG_ERROR, Harvester %s: rbus_get failed for [%s] with error [%d]\n", __FUNCTION__, path, rc));
+        CcspHarvesterTrace(("RDK_LOG_ERROR, Harvester %s: rbus_get failed for %s with error %d\n", __FUNCTION__, path, rc));
         if(mloDevVal != NULL)
+        {
+            rbusValue_Release(mloDevVal);
+            mloDevVal = NULL;
+        }
+
+        /* Fallback to read from file for testing */
+        FILE *fp = fopen("/tmp/harvester_test_mlo.json", "r");
+        if (fp != NULL)
+        {
+             fseek(fp, 0, SEEK_END);
+             long fsize = ftell(fp);
+             fseek(fp, 0, SEEK_SET);
+
+             char *string = malloc(fsize + 1);
+             if (string)
+             {
+                 fread(string, 1, fsize, fp);
+                 string[fsize] = 0;
+                 CcspHarvesterTrace(("RDK_LOG_INFO, Harvester %s: Read MLO data from fallback file /tmp/harvester_test_mlo.json\n", __FUNCTION__));
+                 mloDevDataStr = string;
+             }
+             fclose(fp);
+        }
+        else
+        {
+             CcspHarvesterTrace(("RDK_LOG_ERROR, Harvester %s: Failed to open fallback file /tmp/harvester_test_mlo.json\n", __FUNCTION__));
+        }
+
+        if (mloDevDataStr == NULL)
+        {
+             return 1;
+        }
+    }
+    else
+    {
+        mloDevDataStr = (char *)rbusValue_GetString(mloDevVal, NULL);
+    }
+
+    if(mloDevDataStr == NULL)
+    {
+        CcspHarvesterTrace(("RDK_LOG_ERROR, Harvester %s: mloDevDataStr is NULL\n", __FUNCTION__));
+        if(mloDevVal)
         {
             rbusValue_Release(mloDevVal);
         }
         return 1;
     }
 
-    char *mloDevDataStr = (char *)rbusValue_GetString(mloDevVal, NULL);
-    if(mloDevDataStr == NULL)
+    CcspHarvesterTrace(("RDK_LOG_INFO, Harvester %s: mloDevDataStr is %s\n", __FUNCTION__, mloDevDataStr));
+    jsonVal = cJSON_Parse(mloDevDataStr);
+
+    /* We can free the string if it was from file, as cJSON_Parse makes a copy/parses it */
+    if (mloDevDataStr)
     {
-        CcspHarvesterTrace(("RDK_LOG_ERROR, Harvester %s: mloDevDataStr is NULL\n", __FUNCTION__));
-        rbusValue_Release(mloDevVal);
-        return 1;
+        free(mloDevDataStr);
+        mloDevDataStr = NULL;
     }
 
-    CcspHarvesterTrace(("RDK_LOG_DEBUG, Harvester %s: mloDevDataStr is %s\n", __FUNCTION__, mloDevDataStr));
-    CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Harvester %s: mloDevDataStr is %s\n", __FUNCTION__, mloDevDataStr));
-    
-    jsonVal = cJSON_Parse(mloDevDataStr);
     if(jsonVal == NULL)
     {
         CcspHarvesterTrace(("RDK_LOG_ERROR, Harvester %s: cJSON_Parse failed\n", __FUNCTION__));
-        rbusValue_Release(mloDevVal);
+        if(mloDevVal) rbusValue_Release(mloDevVal);
         return 1;
     }
 
     /* Parse the MLO JSON using our MLO parser */
     int parseRet = mlo_parseAssociatedDeviceDiagnostics(jsonVal, mlo_dev, mloDevCount, vapIndex);
     
-    rbusValue_Release(mloDevVal);
+    if(mloDevVal) rbusValue_Release(mloDevVal);
     cJSON_Delete(jsonVal);
 
     if(parseRet != 0)

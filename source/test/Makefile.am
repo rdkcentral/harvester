@@ -47,6 +47,7 @@ harvester_gtest_bin_SOURCES =  gtest_main.cpp \
                                ${top_srcdir}/source/HarvesterSsp/harvester_radio_traffic.c \
                                ${top_srcdir}/source/HarvesterSsp/harvester_radio_traffic_avropack.c \
                                ${top_srcdir}/source/HarvesterSsp/harvester_rbus_api.c \
+                               ${top_srcdir}/source/HarvesterSsp/harvester_mlo.c \
                                ${top_srcdir}/source/HarvesterSsp/plugin_main.c \
                                ${top_srcdir}/source/HarvesterSsp/webpa_interface.c \
                                ${top_srcdir}/source/HarvesterSsp/webpa_interface_with_seshat.c \
@@ -60,6 +61,7 @@ harvester_gtest_bin_SOURCES =  gtest_main.cpp \
                                webpa_interface_test.cpp \
                                harvester_associated_devices_avropack_test.cpp \
                                harvester_associated_devices_test.cpp \
+                               harvester_mlo_test.cpp \
                                cosa_harvester_internal_test.cpp \
                                cosa_harvester_dml_test.cpp \
                                harvester_rbus_api_test.cpp

@@ -31,6 +31,7 @@
 #include "harvester_avro.h"
 #include "ccsp_harvesterLog_wrapper.h"
 #include "safec_lib_common.h"
+#include "harvester_mlo.h"
 
 
 #define MAGIC_NUMBER      0x85
@@ -48,6 +49,16 @@ uint8_t HASH[16] = {0xa0, 0xfe, 0x2a, 0x90, 0x30, 0x75, 0x41, 0xad,
 uint8_t UUID[16] = {0xec, 0x57, 0xa5, 0xb6, 0xb1, 0x67, 0x46, 0x23,
                     0xba, 0xff, 0x39, 0x9f, 0x06, 0x3b, 0xd5, 0x6a
                    };
+
+// MLO HASH - PLACEHOLDER
+uint8_t MLO_HASH[16] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+                       };
+
+// MLO UUID - PLACEHOLDER
+uint8_t MLO_UUID[16] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+                       };
 
 
 // local data, load it with real data if necessary
@@ -74,6 +85,12 @@ BOOL schema_file_parsed = FALSE;
 size_t AvroSerializedSize;
 size_t OneAvroSerializedSize;
 char AvroSerializedBuf[ WRITER_BUF_SIZE ];
+
+/* MLO Schema Globals */
+char *mlo_buffer = NULL;
+avro_value_iface_t  *mlo_iface = NULL;
+avro_schema_t mlo_avroschema = NULL;
+BOOL mlo_schema_file_parsed = FALSE;
 
 char* GetIDWSchemaBuffer()
 {
@@ -149,7 +166,7 @@ avro_writer_t prepare_writer()
     fseek( fp , 0L , SEEK_END);
     lSize = ftell( fp );
     /* CID: 69140 Argument cannot be negative*/
-    if (lSize < 0) 
+    if (lSize < 0)
         fclose(fp), fputs("lSize is negative value", stderr), exit(1);
 
     /*back to the start of the file*/
@@ -930,5 +947,726 @@ void harvester_avro_cleanup()
         iface = NULL;
   }
   schema_file_parsed = FALSE;
+}
+
+void harvester_mlo_avro_cleanup()
+{
+  if(mlo_buffer != NULL) {
+        free(mlo_buffer); 
+        mlo_buffer = NULL;
+  }
+  if(mlo_iface != NULL){
+        avro_value_iface_decref(mlo_iface);
+        mlo_iface = NULL;
+  }
+  if(mlo_avroschema != NULL){
+        avro_schema_decref(mlo_avroschema);
+        mlo_avroschema = NULL;
+  }
+  mlo_schema_file_parsed = FALSE;
+}
+
+
+
+avro_writer_t prepare_mlo_writer()
+{
+  avro_writer_t writer = {0};
+  long lSize = 0;
+  errno_t rc = -1;
+
+  CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Harvester %s : ENTER \n", __FUNCTION__ ));
+  CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Avro prepares to serialize MLO data\n"));
+
+  if ( mlo_schema_file_parsed == false )
+  {
+    FILE *fp;
+
+    /* open schema file */
+    fp = fopen ( INTERFACE_DEVICES_WIFI_MLO_AVRO_FILENAME , "rb" );
+
+    if ( !fp ) perror( INTERFACE_DEVICES_WIFI_MLO_AVRO_FILENAME " doesn't exist."), exit(1);
+
+    /* seek through file and get file size*/
+    fseek( fp , 0L , SEEK_END);
+    lSize = ftell( fp );
+    if (lSize < 0)
+        fclose(fp), fputs("lSize is negative value", stderr), exit(1);
+
+    /*back to the start of the file*/
+    rewind( fp );
+
+    /* allocate memory for entire content */
+    mlo_buffer = calloc( 1, lSize + 1 );
+
+    if ( !mlo_buffer ) fclose(fp), fputs("memory alloc fails", stderr), exit(1);
+
+    /* copy the file into the buffer */
+    if ( 1 != fread( mlo_buffer , lSize, 1 , fp) )
+      fclose(fp), free(mlo_buffer), fputs("entire read fails", stderr), exit(1);
+
+    fclose(fp);
+
+    mlo_buffer [lSize]= '\0';
+    mlo_schema_file_parsed = TRUE; // parse schema file once only
+    CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Read Avro MLO schema file ONCE, lSize = %ld, pbuffer = 0x%lx.\n", lSize + 1, (ulong)mlo_buffer ));
+  }
+  else
+  {
+    CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Stored lSize = %ld, pbuffer = 0x%lx.\n", lSize + 1, (ulong)mlo_buffer ));
+  }
+
+  // Create mlo_iface ONCE and keep the schema alive (like working non-MLO code)
+  if (mlo_iface == NULL)
+  {
+    //schemas
+    avro_schema_error_t  error = NULL;
+
+    //Master report/datum
+    avro_schema_from_json(mlo_buffer, strlen(mlo_buffer), &mlo_avroschema, &error);
+
+    //generate an avro class from our schema and get a pointer to the value interface
+    mlo_iface = avro_generic_class_from_schema(mlo_avroschema);
+
+    // Keep mlo_avroschema alive - do NOT call avro_schema_decref()
+    // The schema must remain valid as long as mlo_iface exists
+    CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Created mlo_iface ONCE from schema\n"));
+  }
+  else
+  {
+    CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Reusing existing mlo_iface\n"));
+  }
+
+  rc = memset_s(&AvroSerializedBuf[0], sizeof(AvroSerializedBuf), 0, sizeof(AvroSerializedBuf));
+  ERR_CHK(rc);
+
+  AvroSerializedBuf[0] = MAGIC_NUMBER;
+
+  rc = memcpy_s(&AvroSerializedBuf[ MAGIC_NUMBER_SIZE ], sizeof(AvroSerializedBuf)-MAGIC_NUMBER_SIZE, MLO_UUID, sizeof(MLO_UUID));
+  if(rc != EOK)
+  {
+    ERR_CHK(rc);
+    return writer;
+  }
+  rc = memcpy_s(&AvroSerializedBuf[ MAGIC_NUMBER_SIZE + sizeof(MLO_UUID) ], sizeof(AvroSerializedBuf)-MAGIC_NUMBER_SIZE-sizeof(MLO_UUID), MLO_HASH, sizeof(MLO_HASH));
+  if(rc != EOK)
+  {
+    ERR_CHK(rc);
+    return writer;
+  }
+
+  writer = avro_writer_memory(&AvroSerializedBuf[MAGIC_NUMBER_SIZE + SCHEMA_ID_LENGTH], sizeof(AvroSerializedBuf) - MAGIC_NUMBER_SIZE - SCHEMA_ID_LENGTH);
+
+  CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Harvester %s : EXIT \n", __FUNCTION__ ));
+
+  return writer;
+}
+
+/* function call from harvester with parameters for MLO */
+void harvester_report_mlo_associateddevices(struct mlo_associated_device_data *head, char* ServiceType)
+{
+  int j, k = 0;
+
+  int numElements = 0;
+  unsigned long numDevices = 0;
+  mlo_assoc_dev_t *ps = NULL;
+  struct mlo_associated_device_data* ptr = head;
+  avro_writer_t writer;
+  char * serviceName = "harvester";
+  char * dest = "event:raw.kestrel.reports.InterfaceDevicesWifiMLO";
+  char * contentType = "avro/binary";
+  uuid_t transaction_id;
+  char trans_id[37];
+  errno_t rc = -1;
+
+
+  CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Harvester %s : ENTER \n", __FUNCTION__ ));
+
+  /* Count elements and devices */
+  struct mlo_associated_device_data* temp = head;
+  while(temp) {
+      numElements++;
+      numDevices += temp->numAssocDevices;
+      temp = temp->next;
+  }
+
+  CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, numElements = %d, numDevices = %lu\n", numElements, numDevices ));
+
+  OneAvroSerializedSize = 0;
+
+  writer = prepare_mlo_writer();
+
+  //Reset out writer
+  avro_writer_reset(writer);
+
+  //Associated Device Report
+  avro_value_t  adr = {0};
+  avro_generic_value_new(mlo_iface, &adr);
+  avro_value_t  adrField = {0};
+  avro_value_t optional  = {0};
+
+  // timestamp - long
+  avro_value_t headerField = {0};
+  avro_value_t timestampField = {0};
+  avro_value_get_by_name(&adr, "header", &headerField, NULL);
+  if ( CHK_AVRO_ERR ) CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, %s\n", avro_strerror()));
+  avro_value_get_by_name(&headerField, "timestamp", &timestampField, NULL);
+  avro_value_set_branch(&timestampField, 1, &optional);
+  if ( CHK_AVRO_ERR ) CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, %s\n", avro_strerror()));
+
+  struct timeval ts;
+  gettimeofday(&ts, NULL);
+
+#if !defined(UTC_ENABLE_ATOM) && !defined(_HUB4_PRODUCT_REQ_)
+  int64_t tstamp_av_main = ((int64_t) (ts.tv_sec - getTimeOffsetFromUtc()) * 1000000) + (int64_t) ts.tv_usec;
+#else
+  int64_t tstamp_av_main = ((int64_t) (ts.tv_sec) * 1000000) + (int64_t) ts.tv_usec;
+#endif
+  tstamp_av_main = tstamp_av_main/1000;
+
+  avro_value_set_long(&optional, tstamp_av_main );
+
+  // uuid - fixed 16 bytes
+  uuid_generate_random(transaction_id);
+  uuid_unparse(transaction_id, trans_id);
+
+  avro_value_t uuidField = {0};
+  avro_value_get_by_name(&adr, "header", &headerField, NULL);
+  avro_value_get_by_name(&headerField, "uuid", &uuidField, NULL);
+  avro_value_set_branch(&uuidField, 1, &optional);
+  avro_value_set_fixed(&optional, transaction_id, 16);
+
+  //source - string
+  avro_value_t sourceField = {0};
+  avro_value_get_by_name(&adr, "header", &headerField, NULL);
+  avro_value_get_by_name(&headerField, "source", &sourceField, NULL);
+  avro_value_set_branch(&sourceField, 1, &optional);
+  avro_value_set_string(&optional, ReportSource);
+
+  //cpe_id block
+  if ( macStr == NULL )
+  {
+    macStr = getDeviceMac();
+    rc = strcpy_s(CpemacStr,sizeof(CpemacStr),macStr);
+    if(rc != EOK) { ERR_CHK(rc); return; }
+  }
+
+  char hex[3] = {0};
+  unsigned char CpeMacid[ 7 ] = {0};
+  for (k = 0; k < 6; k++ )
+  {
+    hex[0] = CpemacStr[ k * 2 ];
+    hex[1] = CpemacStr[ k * 2 + 1 ];
+    hex[2] = 0;
+    CpeMacid[ k ] = (unsigned char)strtol(hex, NULL, 16);
+  }
+  avro_value_t cpeIdField = {0};
+  avro_value_t macAddressField = {0};
+  avro_value_get_by_name(&adr, "cpe_id", &cpeIdField, NULL);
+  avro_value_get_by_name(&cpeIdField, "mac_address", &macAddressField, NULL);
+  avro_value_set_branch(&macAddressField, 1, &optional);
+  avro_value_set_fixed(&optional, CpeMacid, 6);
+
+  // cpe_type - string
+  avro_value_t cpeTypeField = {0};
+  avro_value_get_by_name(&adr, "cpe_id", &cpeIdField, NULL);
+  avro_value_get_by_name(&cpeIdField, "cpe_type", &cpeTypeField, NULL);
+  avro_value_set_branch(&cpeTypeField, 1, &optional);
+  avro_value_set_string(&optional, CPE_TYPE_STRING);
+
+  // cpe_parent - Recurrsive CPEIdentifier block (Assuming default handling as existing function)
+  avro_value_get_by_name(&adr, "cpe_id", &adrField, NULL);
+  avro_value_get_by_name(&adrField, "cpe_parent", &adrField, NULL);
+  if ( cpe_parent_exists == false )
+  {
+      avro_value_set_branch(&adrField, 0, &optional);
+      avro_value_set_null(&optional);
+  }
+  else
+  {
+      avro_value_t parent_optional, parent_adrField;
+      avro_value_set_branch(&adrField, 1, &parent_optional);
+      avro_value_get_by_name(&parent_optional, "mac_address", &parent_adrField, NULL);
+      avro_value_set_branch(&parent_adrField, 1, &parent_optional);
+      avro_value_set_fixed(&parent_optional, ParentCpeMacid, 6);
+
+      avro_value_set_branch(&adrField, 1, &parent_optional);
+      avro_value_get_by_name(&parent_optional, "cpe_type", &parent_adrField, NULL);
+      avro_value_set_branch(&parent_adrField, 1, &parent_optional);
+      avro_value_set_string(&parent_optional, PARENT_CPE_TYPE_STRING);
+
+      avro_value_set_branch(&adrField, 1, &parent_optional);
+      avro_value_get_by_name(&parent_optional, "cpe_parent", &parent_adrField, NULL);
+      avro_value_set_branch(&parent_adrField, 0, &parent_optional);
+      avro_value_set_null(&parent_optional);
+  }
+
+  // VAP Index
+  avro_value_get_by_name(&adr, "vap_index", &adrField, NULL);
+  if (head->vapIndex) {
+      avro_value_set_branch(&adrField, 1, &optional);
+      avro_value_set_string(&optional, head->vapIndex);
+  } else {
+      avro_value_set_branch(&adrField, 0, &optional);
+      avro_value_set_null(&optional);
+  }
+
+  // Num Assoc Devices
+  avro_value_get_by_name(&adr, "num_assoc_devices", &adrField, NULL);
+  avro_value_set_branch(&adrField, 1, &optional);
+  avro_value_set_int(&optional, (int)numDevices);
+
+  // Version - (Not available in struct, checking definition or placeholder)
+   avro_value_get_by_name(&adr, "version", &adrField, NULL);
+   avro_value_set_branch(&adrField, 0, &optional);
+   avro_value_set_null(&optional);
+
+  //Data Field block
+  avro_value_get_by_name(&adr, "data", &adrField, NULL);
+
+  //Device Report
+  avro_value_t dr = {0};
+  avro_value_t drField = {0};
+
+  //Links
+  avro_value_t links_array = {0};
+  avro_value_t link_record = {0};
+  avro_value_t linkField = {0};
+
+  avro_value_t interferenceSource = {0};
+
+
+
+  while(ptr != NULL)
+  {
+      for (j = 0, ps = ptr->devicedata; j < ptr->numAssocDevices; j++, ps++)
+      {
+           CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, MLO Device %d\n", j));
+
+           //Append a DeviceReport item to array
+           avro_value_append(&adrField, &dr, NULL);
+
+           //device_mac - fixed 6 bytes
+           avro_value_get_by_name(&dr, "device_id", &drField, NULL);
+           avro_value_get_by_name(&drField, "mac_address", &drField, NULL);
+           avro_value_set_branch(&drField, 1, &optional);
+           avro_value_set_fixed(&optional, ps->cli_MACAddress, 6);
+
+           //device_type - string
+           avro_value_get_by_name(&dr, "device_id", &drField, NULL);
+           avro_value_get_by_name(&drField, "device_type", &drField, NULL);
+           avro_value_set_branch(&drField, 1, &optional);
+           avro_value_set_string(&optional, DEVICE_TYPE);
+
+           //timestamp - long
+           avro_value_get_by_name(&dr, "timestamp", &drField, NULL);
+           avro_value_set_branch(&drField, 1, &optional);
+           int64_t tstamp_av = (int64_t) ptr->timestamp.tv_sec * 1000000 + (int64_t) ptr->timestamp.tv_usec;
+           tstamp_av = tstamp_av/1000;
+           avro_value_set_long(&optional, tstamp_av);
+
+           // Service_type
+           avro_value_get_by_name(&dr, "service_type", &drField, NULL);
+           int enum_val = avro_schema_enum_get_by_name(avro_value_get_schema(&drField), ServiceType);
+           if (enum_val > -1) {
+               avro_value_set_enum(&drField, enum_val);
+           } else {
+               CcspHarvesterConsoleTrace(("RDK_LOG_ERROR, ServiceType '%s' not found in schema! Defaulting to PRIVATE.\n", ServiceType));
+               avro_value_set_enum(&drField, avro_schema_enum_get_by_name(avro_value_get_schema(&drField), "PRIVATE"));
+           }
+
+           // Num Links
+           avro_value_get_by_name(&dr, "num_links", &drField, NULL);
+           avro_value_set_branch(&drField, 1, &optional);
+           avro_value_set_int(&optional, ps->numLinks);
+
+           // Links Array
+           avro_value_get_by_name(&dr, "links", &links_array, NULL);
+
+           /* Iterate through Links for MLO */
+           for (int l = 0; l < ps->numLinks && l < MAX_MLO_LINKS; l++)
+           {
+                mlo_link_data_t *link = &ps->links[l];
+
+                CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, \tLink %d\n", l));
+
+                // Append a Link record to Links array
+                avro_value_append(&links_array, &link_record, NULL);
+
+                // band
+                avro_value_get_by_name(&link_record, "band", &linkField, NULL);
+                if (strlen(link->band) == 0) {
+                    avro_value_set_branch(&linkField, 0, &optional);
+                    avro_value_set_null(&optional);
+                } else {
+                    avro_value_set_branch(&linkField, 1, &optional);
+                    const char *band_sym = "_5GHz";
+                    if(strcmp(link->band, "2G") == 0 || strstr(link->band, "2.4") != NULL) band_sym = "_2_4GHz";
+                    else if(strcmp(link->band, "5G") == 0) band_sym = "_5GHz";
+                    else if(strcmp(link->band, "6G") == 0) band_sym = "_6GHz";
+
+                    avro_value_set_enum(&optional, avro_schema_enum_get_by_name(avro_value_get_schema(&optional), band_sym));
+                }
+
+                // association_link
+                avro_value_get_by_name(&link_record, "association_link", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_boolean(&optional, link->associationLink ? 1 : 0);
+
+                // active
+                avro_value_get_by_name(&link_record, "active", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_boolean(&optional, link->cli_Active ? 1 : 0);
+
+                // interface_mac - Set to NULL as per new requirement (ambiguous/missing)
+                avro_value_get_by_name(&link_record, "interface_mac", &linkField, NULL);
+                avro_value_set_branch(&linkField, 0, &optional);
+                avro_value_set_null(&optional);
+
+                // interface_parameters
+                avro_value_get_by_name(&link_record, "interface_parameters", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+
+                // operating standard
+                avro_value_get_by_name(&optional, "operating_standard", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                if ( strlen(link->cli_OperatingStandard ) == 0 )
+                    avro_value_set_null(&optional);
+                else
+                    avro_value_set_enum(&optional, avro_schema_enum_get_by_name(avro_value_get_schema(&optional), link->cli_OperatingStandard));
+
+                // operating channel bandwidth
+                avro_value_get_by_name(&link_record, "interface_parameters", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "operating_channel_bandwidth", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                if ( strstr(link->cli_OperatingChannelBandwidth, "20MHz") )
+                    avro_value_set_enum(&optional, avro_schema_enum_get_by_name(avro_value_get_schema(&optional), "_20MHz"));
+                else if ( strstr(link->cli_OperatingChannelBandwidth, "40MHz") )
+                    avro_value_set_enum(&optional, avro_schema_enum_get_by_name(avro_value_get_schema(&optional), "_40MHz"));
+                else if ( strstr(link->cli_OperatingChannelBandwidth, "80MHz") )
+                    avro_value_set_enum(&optional, avro_schema_enum_get_by_name(avro_value_get_schema(&optional), "_80MHz"));
+                else if ( strstr(link->cli_OperatingChannelBandwidth, "160MHz") )
+                    avro_value_set_enum(&optional, avro_schema_enum_get_by_name(avro_value_get_schema(&optional), "_160MHz"));
+                else if ( strstr(link->cli_OperatingChannelBandwidth, "320MHz") )
+                    avro_value_set_enum(&optional, avro_schema_enum_get_by_name(avro_value_get_schema(&optional), "_320MHz"));
+                else
+                    avro_value_set_null(&optional);
+
+                // frequency band
+                avro_value_get_by_name(&link_record, "interface_parameters", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "frequency_band", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                if(strcmp(link->band, "2G") == 0 || strstr(link->band, "2.4") != NULL)
+                    avro_value_set_enum(&optional, avro_schema_enum_get_by_name(avro_value_get_schema(&optional), "_2_4GHz" ));
+                else if(strcmp(link->band, "5G") == 0)
+                    avro_value_set_enum(&optional, avro_schema_enum_get_by_name(avro_value_get_schema(&optional), "_5GHz" ));
+                else if(strcmp(link->band, "6G") == 0)
+                    avro_value_set_enum(&optional, avro_schema_enum_get_by_name(avro_value_get_schema(&optional), "_6GHz" ));
+                else
+                    avro_value_set_enum(&optional, avro_schema_enum_get_by_name(avro_value_get_schema(&optional), "_5GHz" ));
+
+                // channel
+                avro_value_get_by_name(&link_record, "interface_parameters", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "channel", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_int(&optional, 0);
+
+                // ssid
+                avro_value_get_by_name(&link_record, "interface_parameters", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "ssid", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_string(&optional, "MLO");
+
+                // interface_metrics
+                avro_value_get_by_name(&link_record, "interface_metrics", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+
+                // authenticated
+                avro_value_get_by_name(&optional, "authenticated", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_boolean(&optional, link->cli_AuthenticationState ? 1 : 0);
+
+                // authentication_failures
+                avro_value_get_by_name(&link_record, "interface_metrics", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "authentication_failures", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_int(&optional, link->cli_AuthenticationFailures);
+
+                // retrans_count
+                avro_value_get_by_name(&link_record, "interface_metrics", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "retrans_count", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_int(&optional, link->cli_RetransCount);
+
+                // min_rssi
+                avro_value_get_by_name(&link_record, "interface_metrics", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "min_rssi", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_int(&optional, link->cli_MinRSSI);
+
+                // max_rssi
+                avro_value_get_by_name(&link_record, "interface_metrics", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "max_rssi", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_int(&optional, link->cli_MaxRSSI);
+
+                // data_frames_sent_ack
+                avro_value_get_by_name(&link_record, "interface_metrics", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "data_frames_sent_ack", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_long(&optional, link->cli_DataFramesSentAck);
+
+                // data_frames_sent_no_ack
+                avro_value_get_by_name(&link_record, "interface_metrics", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "data_frames_sent_no_ack", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_long(&optional, link->cli_DataFramesSentNoAck);
+
+                // disassociations
+                avro_value_get_by_name(&link_record, "interface_metrics", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "disassociations", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_int(&optional, link->cli_Disassociations);
+
+                // interference_sources
+                avro_value_get_by_name(&link_record, "interface_metrics", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "interference_sources", &linkField, NULL);
+
+                if (strlen(link->cli_InterferenceSources) == 0) {
+                     avro_value_set_branch(&linkField, 0, &optional);
+                     avro_value_set_null(&optional);
+                } else {
+                     avro_value_set_branch(&linkField, 1, &optional);
+                     // Now optional is the ARRAY
+
+                     if (strstr( link->cli_InterferenceSources, "MicrowaveOven") != NULL ) {
+                        avro_value_append(&optional, &interferenceSource, NULL);
+                        avro_value_set_string(&interferenceSource,"MicrowaveOven");
+                     }
+                     if (strstr( link->cli_InterferenceSources, "CordlessPhone") != NULL ) {
+                        avro_value_append(&optional, &interferenceSource, NULL);
+                        avro_value_set_string(&interferenceSource,"CordlessPhone");
+                     }
+                     if (strstr( link->cli_InterferenceSources, "BluetoothDevices") != NULL ) {
+                        avro_value_append(&optional, &interferenceSource, NULL);
+                        avro_value_set_string(&interferenceSource,"BluetoothDevices");
+                     }
+                     if (strstr( link->cli_InterferenceSources, "FluorescentLights") != NULL ) {
+                        avro_value_append(&optional, &interferenceSource, NULL);
+                        avro_value_set_string(&interferenceSource,"FluorescentLights");
+                     }
+                     if (strstr( link->cli_InterferenceSources, "ContinuousWaves") != NULL ) {
+                        avro_value_append(&optional, &interferenceSource, NULL);
+                        avro_value_set_string(&interferenceSource,"ContinuousWaves");
+                     }
+                     // If we had no matches but string was not empty, wait.
+                     // The original code appended "Others" unconditionally at the end.
+                     // Let's keep that behavior if desired, or maybe only if others are present?
+                     // Original: avro_value_append(&linkField, &interferenceSource, NULL); avro_value_set_string(..., "Others");
+                     // We'll append Others to be safe/consistent.
+                     avro_value_append(&optional, &interferenceSource, NULL);
+                     avro_value_set_string(&interferenceSource,"Others");
+                }
+
+                // rx_rate
+                avro_value_get_by_name(&link_record, "interface_metrics", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "rx_rate", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_float(&optional, (float)link->cli_LastDataDownlinkRate);
+
+                // tx_rate
+                avro_value_get_by_name(&link_record, "interface_metrics", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "tx_rate", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_float(&optional, (float)link->cli_LastDataUplinkRate);
+
+                // signal_strength
+                avro_value_get_by_name(&link_record, "interface_metrics", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "signal_strength", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_float(&optional, (float)link->cli_SignalStrength);
+
+                // retransmissions
+                avro_value_get_by_name(&link_record, "interface_metrics", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "retransmissions", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_int(&optional, link->cli_Retransmissions);
+
+                // snr
+                avro_value_get_by_name(&link_record, "interface_metrics", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "snr", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_float(&optional, (float)link->cli_SNR);
+
+                // bytes_sent
+                avro_value_get_by_name(&link_record, "interface_metrics", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "bytes_sent", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_long(&optional, link->cli_BytesSent);
+
+                // bytes_received
+                avro_value_get_by_name(&link_record, "interface_metrics", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "bytes_received", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_long(&optional, link->cli_BytesReceived);
+
+                // packets_sent
+                avro_value_get_by_name(&link_record, "interface_metrics", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "packets_sent", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_long(&optional, link->cli_PacketsSent);
+
+                // packets_received
+                avro_value_get_by_name(&link_record, "interface_metrics", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "packets_received", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_long(&optional, link->cli_PacketsReceived);
+
+                // errors
+                avro_value_get_by_name(&link_record, "interface_metrics", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "errors", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_int(&optional, link->cli_Errors);
+
+                // rssi
+                avro_value_get_by_name(&link_record, "interface_metrics", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_get_by_name(&optional, "rssi", &linkField, NULL);
+                avro_value_set_branch(&linkField, 1, &optional);
+                avro_value_set_int(&optional, link->cli_RSSI);
+
+           }
+      }
+      ptr = ptr->next;
+  }
+
+  /* Calculate serialized size safely to avoid buffer overflow */
+  size_t avro_size = 0;
+  if (avro_value_sizeof(&adr, &avro_size))
+  {
+    CcspHarvesterTrace(("RDK_LOG_ERROR, %s: avro_value_sizeof failed\n", __FUNCTION__));
+    avro_value_decref(&adr);
+    avro_writer_free(writer);
+    return;
+  }
+
+  size_t framing = MAGIC_NUMBER_SIZE + SCHEMA_ID_LENGTH;
+  size_t total_expected = avro_size + framing;
+
+  if (total_expected > sizeof(AvroSerializedBuf))
+  {
+      CcspHarvesterTrace(("RDK_LOG_ERROR, Harvester %s : Serialized size %zu exceeds buffer %zu. Dropping report.\n", __FUNCTION__, total_expected, sizeof(AvroSerializedBuf)));
+      avro_value_decref(&adr);
+      avro_writer_free(writer);
+      return;
+  }
+
+  if (avro_value_write(writer, &adr))
+  {
+    CcspHarvesterTrace(("RDK_LOG_ERROR, %s: avro_value_write failed\n", __FUNCTION__));
+    avro_value_decref(&adr);
+    avro_writer_free(writer);
+    return;
+  }
+
+  /* Verify what was actually written matches expectations */
+  int64_t written_raw = avro_writer_tell(writer);
+  if (written_raw <= 0)
+  {
+    CcspHarvesterTrace(( "RDK_LOG_ERROR, %s: Avro write failed or empty. Bytes written: %" PRId64 "\n", __FUNCTION__, written_raw ));
+    avro_value_decref(&adr);
+    avro_writer_free(writer);
+    return;
+  }
+
+  AvroSerializedSize = framing + (size_t)written_raw;
+  CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Serialized size %zu\n", AvroSerializedSize));
+
+  /* Free up memory */
+  avro_value_decref(&adr);
+  avro_writer_free(writer);
+
+  if ( consoleDebugEnable )
+  {
+    /* b64 encoding */
+    size_t decodesize = b64_get_encoded_buffer_size( AvroSerializedSize );
+    uint8_t *b64buffer = malloc(decodesize * sizeof(uint8_t));
+    if(b64buffer == NULL)
+    {
+      CcspHarvesterTrace(("RDK_LOG_ERROR, %s: Failed to allocate memory for b64 buffer\n", __FUNCTION__));
+    }
+    else
+    {
+      b64_encode( (uint8_t*)AvroSerializedBuf, AvroSerializedSize, b64buffer);
+      fprintf( stderr, "\nAVro serialized data\n");
+      int print_error = 0;
+      for (k = 0; k < (int)AvroSerializedSize ; k++)
+      {
+        char buf[30];
+        if ( ( k % 32 ) == 0 )
+          fprintf( stderr, "\n");
+        rc = sprintf_s(buf,sizeof(buf),"%02X", (unsigned char)AvroSerializedBuf[k]);
+        if(rc < EOK)
+        {
+          ERR_CHK(rc);
+          print_error = 1;
+          break;
+        }
+        fprintf( stderr, "%c%c", buf[0], buf[1] );
+      }
+
+      if (!print_error)
+      {
+          fprintf( stderr, "\n\nB64 data\n");
+          for (k = 0; k < (int)decodesize; k++)
+          {
+            if ( ( k % 32 ) == 0 )
+              fprintf( stderr, "\n");
+            fprintf( stderr, "%c", b64buffer[k]);
+          }
+          fprintf( stderr, "\n\n");
+      }
+      free(b64buffer);
+    }
+  }
+
+  CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Before AD WebPA SEND message call\n"));
+  CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, serviceName: %s\n", serviceName));
+  CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, dest: %s\n", dest));
+  CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, trans_id: %s\n", trans_id));
+  CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, contentType: %s\n", contentType));
+  CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, AvroSerializedBuf: %s\n", AvroSerializedBuf));
+  CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, AvroSerializedSize: %d\n", (int)AvroSerializedSize));
+  // Send data from Harvester to webpa using CCSP bus interface
+  sendWebpaMsg(serviceName, dest, trans_id, contentType, AvroSerializedBuf, AvroSerializedSize);
+  CcspHarvesterTrace(("RDK_LOG_WARN, InterfaceDevicesWifiMLO report sent to Webpa, Destination=%s, Transaction-Id=%s  \n",dest,trans_id));
+  CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, After AD WebPA SEND message call\n"));
+
+  CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Harvester %s : EXIT \n", __FUNCTION__ ));
+
+#if SIMULATION
+  exit(0);
+#endif
 }
 

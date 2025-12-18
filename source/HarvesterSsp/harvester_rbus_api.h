@@ -145,11 +145,11 @@ int rbus_getMloAssociatedDeviceDiagnosticResult(int index, mlo_assoc_dev_t **mlo
 /**
  * To persist TR181 parameter values in PSM DB.
  */
-int rbus_StoreValueIntoDB(char *paramName, char *value);
+int rbus_StoreValueIntoPsmDB(char *paramName, char *value);
 
 /**
  * To fetch TR181 parameter values from PSM DB.
  */
-int rbus_GetValueFromDB( char* paramName, char** paramValue);
+int rbus_GetValueFromPsmDB( char* paramName, char** paramValue);
 
 #endif

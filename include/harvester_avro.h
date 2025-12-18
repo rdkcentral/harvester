@@ -23,6 +23,7 @@
 #include <sys/time.h>
 #include <wifi_hal.h>
 #include <pthread.h>
+#include "harvester_mlo.h"
 
 #ifndef UNIT_TEST_DOCKER_SUPPORT
     #define STATIC                    static
@@ -69,6 +70,7 @@ wifi_radioTrafficStats2_t* rtdata;
 };
 
 extern void harvester_report_associateddevices(struct associateddevicedata *head, char* ServiceType);
+extern void harvester_report_mlo_associateddevices(struct mlo_associated_device_data *head, char* ServiceType);
 extern void harvester_report_neighboringap(struct neighboringapdata *head);
 extern void harvester_report_radiotraffic(struct radiotrafficdata *head);
 

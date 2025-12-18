@@ -40,6 +40,11 @@ extern "C" {
 
 #include "harvester_associated_devices.h"
 #include "harvester_avro.h"
+
+// MLO Avro variables
+extern char *mlo_buffer;
+extern void* mlo_iface;
+extern BOOL mlo_schema_file_parsed;
 }
 
 TEST_F(HarvesterTestFixture, GetIDWSchemaBuffer) {
@@ -154,5 +159,21 @@ TEST_F(HarvesterTestFixture, harvester_avro_cleanup) {
     EXPECT_EQ(buffer, nullptr);
     EXPECT_EQ(iface, nullptr);
     EXPECT_EQ(schema_file_parsed, false);
+}
+
+TEST_F(HarvesterTestFixture, harvester_mlo_avro_cleanup) {
+
+    mlo_buffer = (char*)malloc(16);
+    ASSERT_NE(mlo_buffer, nullptr);
+    
+    mlo_iface = (char*)malloc(16);
+    ASSERT_NE(mlo_iface, nullptr);
+    mlo_schema_file_parsed = true;
+
+    harvester_mlo_avro_cleanup();
+
+    EXPECT_EQ(mlo_buffer, nullptr);
+    EXPECT_EQ(mlo_iface, nullptr);
+    EXPECT_EQ(mlo_schema_file_parsed, false);
 }
 
