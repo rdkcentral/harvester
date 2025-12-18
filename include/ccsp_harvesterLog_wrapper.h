@@ -20,9 +20,6 @@
 #ifndef  _CCSP_HARVLOG_WRPPER_H_ 
 #define  _CCSP_HARVLOG_WRPPER_H_
 
-#include <stdio.h>
-#include <stdlib.h>
-
 extern int consoleDebugEnable;
 extern FILE* debugLogFile;
 

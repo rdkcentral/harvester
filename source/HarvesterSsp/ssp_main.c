@@ -161,6 +161,41 @@ int  cmd_dispatch(int  command)
              {
                  fprintf(stderr, "RDK_LOG_INFO, Registered Harvester component '%s' with RBUS ..\n", RBUS_HARVESTER_COMPONENT_NAME);
              }
+
+             if(rbusInitializedCheck())
+             {
+                 if(regHarvesterDataModel() != -1)
+                 {
+                    CcspHarvesterTrace(("RDK_LOG_INFO, %s: Harvester Data Model registered successfully\n", __FUNCTION__));
+                 }
+                 else
+                 {
+                    CcspHarvesterTrace(("RDK_LOG_ERROR, %s: Harvester Data Model registration failed\n", __FUNCTION__));
+                 }
+                 /* Load initial value from PSM */
+                 rbusError_t ret = RBUS_ERROR_SUCCESS;
+                 char *tmpchar = NULL;
+                 ret = rbus_GetValueFromDB(HARVESTER_MLO_PSM_PARAM, &tmpchar);
+                 if (ret == RBUS_ERROR_SUCCESS && tmpchar != NULL)
+                 {
+                    if ((strcmp(tmpchar, "true") == 0) || (strcmp(tmpchar, "TRUE") == 0))
+                    {
+                        set_HarvesterMLORfcEnable(true);
+                    }
+                    else
+                    {
+                        set_HarvesterMLORfcEnable(false);
+                    }
+                    free(tmpchar);
+                    CcspHarvesterTrace(("RDK_LOG_INFO, %s: Loaded MLO RFC value from PSM = %d\n", __FUNCTION__, get_HarvesterMLORfcEnable()));
+                 }
+                 else
+                 {
+                    /* Default to false if PSM value doesn't exist */
+                    set_HarvesterMLORfcEnable(false);
+                    CcspHarvesterTrace(("RDK_LOG_INFO, %s: MLO RFC PSM value not found, defaulting to false\n", __FUNCTION__));
+                 }    
+             }
         #endif
 
             returnStatus = ssp_create();

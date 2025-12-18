@@ -121,9 +121,7 @@ void delete_mlo_list(struct mlo_associated_device_data *head);
 bool get_HarvesterMLORfcEnable(void);
 
 /**
- * @brief Set MLO RFC enable status
- * @param[in] bValue true to enable, false to disable
- * @return 0 for success, 1 for failure
+ * @brief Set MLO RFC enable status and persist to PSM
  */
 int set_HarvesterMLORfcEnable(bool bValue);
 
@@ -131,7 +129,7 @@ int set_HarvesterMLORfcEnable(bool bValue);
  * @brief Initialize and register MLO RFC RBUS data elements
  * @return 0 for success, 1 for failure
  */
-int harvesterMLO_RfcInit(void);
+int regHarvesterDataModel(void);
 
 /**
  * @brief Unregister MLO RFC RBUS data elements

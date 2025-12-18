@@ -43,6 +43,10 @@ bool get_HarvesterMLORfcEnable(void)
  */
 int set_HarvesterMLORfcEnable(bool bValue)
 {
+    // Updare global mlo rfc variable
+    g_MLORfcEnabled = bValue;
+
+    // Update PSM DB Value
     rbusError_t retPsmSet = RBUS_ERROR_SUCCESS;
     char *buf = NULL;
 
@@ -63,7 +67,6 @@ int set_HarvesterMLORfcEnable(bool bValue)
 
     CcspHarvesterTrace(("RDK_LOG_INFO, %s: PSM set success for parameter %s and value %s\n", __FUNCTION__, HARVESTER_MLO_PSM_PARAM, buf));
     free(buf);
-    g_MLORfcEnabled = bValue;
     return 0;
 }
 
@@ -183,16 +186,16 @@ static rbusError_t harvesterMLO_RfcSetHandler(rbusHandle_t handle, rbusProperty_
 /**
  * @brief Initialize and register MLO RFC RBUS data elements
  */
-int harvesterMLO_RfcInit()
+int regHarvesterDataModel()
 {
     rbusError_t ret = RBUS_ERROR_SUCCESS;
     rbusHandle_t handle = get_rbus_handle();
-    char *tmpchar = NULL;
+
 
     if (handle == NULL)
     {
         CcspHarvesterTrace(("RDK_LOG_ERROR, %s: rbus handle is NULL\n", __FUNCTION__));
-        return 1;
+        return -1;
     }
 
     CcspHarvesterTrace(("RDK_LOG_INFO, %s: Registering MLO RFC parameter %s\n", __FUNCTION__, HARVESTER_MLO_RFC_PARAM));
@@ -206,32 +209,8 @@ int harvesterMLO_RfcInit()
     if (ret != RBUS_ERROR_SUCCESS)
     {
         CcspHarvesterTrace(("RDK_LOG_ERROR, %s: rbus_regDataElements failed with error %d\n", __FUNCTION__, ret));
-        return 1;
+        return -1;
     }
-
-    /* Load initial value from PSM */
-    ret = rbus_GetValueFromDB(HARVESTER_MLO_PSM_PARAM, &tmpchar);
-    if (ret == RBUS_ERROR_SUCCESS && tmpchar != NULL)
-    {
-        if ((strcmp(tmpchar, "true") == 0) || (strcmp(tmpchar, "TRUE") == 0))
-        {
-            g_MLORfcEnabled = true;
-        }
-        else
-        {
-            g_MLORfcEnabled = false;
-        }
-        free(tmpchar);
-        CcspHarvesterTrace(("RDK_LOG_INFO, %s: Loaded MLO RFC value from PSM = %d\n", __FUNCTION__, g_MLORfcEnabled));
-    }
-    else
-    {
-        /* Default to false if PSM value doesn't exist */
-        g_MLORfcEnabled = false;
-        CcspHarvesterTrace(("RDK_LOG_INFO, %s: MLO RFC PSM value not found, defaulting to false\n", __FUNCTION__));
-    }
-
-    CcspHarvesterTrace(("RDK_LOG_INFO, %s: MLO RFC registration success, initial value = %s\n", __FUNCTION__, g_MLORfcEnabled ? "true" : "false"));
     return 0;
 }
 
@@ -367,7 +346,7 @@ int mlo_parseAssociatedDeviceDiagnostics(void *jsonVal, mlo_assoc_dev_t **associ
         CcspHarvesterTrace(("RDK_LOG_WARN, %s: MAC not found for device %d\n", __FUNCTION__, i));
     }
 
-    /* Parse NumLinks */
+    /* Parse NumLinks -- Confirm whether its NUM or STRING */
     jsonItem = cJSON_GetObjectItem(client, "NumLinks");
     if (jsonItem != NULL && jsonItem->valuestring != NULL) {
       dev[i].numLinks = atoi(jsonItem->valuestring);
@@ -433,7 +412,7 @@ int mlo_parseAssociatedDeviceDiagnostics(void *jsonVal, mlo_assoc_dev_t **associ
       if (jsonItem != NULL && jsonItem->valuestring != NULL)
       {
         link_data->cli_BytesSent = strtoull(jsonItem->valuestring, NULL, 10);
-        CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, \tBytesSent: %llu\n", link_data->cli_BytesSent));
+        CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, \tBytesSent: %llu\n", (unsigned long long)link_data->cli_BytesSent));
       }
 
       /* BytesReceived */
@@ -441,7 +420,7 @@ int mlo_parseAssociatedDeviceDiagnostics(void *jsonVal, mlo_assoc_dev_t **associ
       if (jsonItem != NULL && jsonItem->valuestring != NULL)
       {
         link_data->cli_BytesReceived = strtoull(jsonItem->valuestring, NULL, 10);
-        CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, \tBytesReceived: %llu\n", link_data->cli_BytesReceived));
+        CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, \tBytesReceived: %llu\n", (unsigned long long)link_data->cli_BytesReceived));
       }
 
       /* PacketsSent */
@@ -592,8 +571,7 @@ int mlo_parseAssociatedDeviceDiagnostics(void *jsonVal, mlo_assoc_dev_t **associ
     }
   }
 
-  CcspHarvesterTrace(
-      ("RDK_LOG_INFO, mlo_parse: Successfully Parsed %u MLO devices\n", *assocDevCount));
+  CcspHarvesterTrace(("RDK_LOG_INFO, mlo_parseAssociatedDeviceDiagnostics: Successfully Parsed %u MLO devices\n", *assocDevCount));
   return 0;
 }
 
@@ -659,7 +637,7 @@ void print_mlo_list(struct mlo_associated_device_data *head) {
 
   while (ptr != NULL) {
     CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, MLO Node[%d]: VapIndex=%s "
-                               "NumDevices=%lu Timestamp=%link_data\n",
+                               "NumDevices=%lu Timestamp=%ld\n",
                                nodeNum, ptr->vapIndex ? ptr->vapIndex : "NULL",
                                ptr->numAssocDevices,
                                (long)ptr->timestamp.tv_sec));

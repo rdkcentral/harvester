@@ -39,7 +39,7 @@ if RDK_ONEWIFI
 libHarvesterSsp_la_SOURCES += harvester_rbus_api.c harvester_mlo.c
 endif
 
-libHarvesterSsp_la_LDFLAGS = -lccsp_common -lm -lpthread -lavro -lhal_wifi -lmsgpackc -ltrower-base64 -luuid -lsecure_wrapper -lrbus
+libHarvesterSsp_la_LDFLAGS = -lccsp_common -lm -lpthread -lavro -lhal_wifi -lmsgpackc -ltrower-base64 -luuid -lsecure_wrapper
 libHarvesterSsp_la_CFLAGS = -I${top_srcdir}/include
 
 if CORE_NET_LIB_FEATURE_SUPPORT
