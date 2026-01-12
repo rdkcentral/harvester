@@ -19,6 +19,7 @@
    
 #include <stdio.h>
 #include <assert.h>
+#include <inttypes.h>
 #include <avro.h>
 #include <arpa/inet.h>
 #include <semaphore.h>  /* Semaphore */
@@ -286,11 +287,6 @@ void harvester_report_associateddevices(struct associateddevicedata *head, char*
 
   avro_value_set_long(&optional, tstamp_av_main );
    /* Coverity Fix CID: 124833  PRINTF_ARGS*/ 
-#ifdef _64BIT_ARCH_SUPPORT_
-  CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, timestamp = %ld\n", tstamp_av_main ));
-#else
-  CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, timestamp = %lld\n", tstamp_av_main ));
-#endif
   CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, timestamp = ""%" PRId64 "\n", tstamp_av_main ));
 
   CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, timestamp\tType: %d\n", avro_value_get_type(&optional)));
