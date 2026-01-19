@@ -106,7 +106,6 @@ TEST_F(HarvesterMLOTest, AddToMloList_Success) {
     add_to_mlo_list(&head, (char*)"1", 1, devData);
 
     ASSERT_NE(head, nullptr);
-    EXPECT_STREQ(head->vapIndex, "1");
     EXPECT_EQ(head->numAssocDevices, 1);
     EXPECT_EQ(head->devicedata, devData);
     EXPECT_EQ(head->next, nullptr);
@@ -124,7 +123,6 @@ TEST_F(HarvesterMLOTest, AddToMloList_Append) {
 
     ASSERT_NE(head, nullptr);
     ASSERT_NE(head->next, nullptr);
-    EXPECT_STREQ(head->next->vapIndex, "2");
     EXPECT_EQ(head->next->numAssocDevices, 2);
 
     delete_mlo_list(head);

@@ -24,6 +24,7 @@
 #include "harvester_avro.h"
 #include "harvester_mlo.h"
 #include <rbus/rbus.h>
+#include "harvester_associated_devices.h"
 
 /**
  * @brief Gets the rbus_handle for harvester.
@@ -136,11 +137,10 @@ int rbus_wifi_getNeighboringWiFiDiagnosticResult2(bool *executed, wifi_neighbor_
  *
  * @param[out] mloDevCount Number of MLO devices.
  *
- * @param[out] vapIndex VAP index string (caller must free).
- *
  * @return status 0 for success, 1 for failure
  */
-int rbus_getMloAssociatedDeviceDiagnosticResult(int index, mlo_assoc_dev_t **mlo_dev, uint32_t *mloDevCount, char **vapIndex);
+
+int rbus_getMloAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t **mlo_dev, bool **mld_enable_list, char ***band_list, uint32_t *mloDevCount);
 
 /**
  * To persist TR181 parameter values in PSM DB.

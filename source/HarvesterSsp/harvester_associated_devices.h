@@ -150,5 +150,4 @@ BOOL GetIDWHarvestingStatus();
  */
 int parseInputValue(char * value);
 #endif
-void harvester_mlo_avro_cleanup();
 #endif 

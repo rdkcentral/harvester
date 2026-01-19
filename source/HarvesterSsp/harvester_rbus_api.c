@@ -40,6 +40,7 @@
 #include "secure_wrapper.h"
 #include "harvester_rbus_api.h"
 #include <cJSON.h>
+#include "harvester_associated_devices.h"
 
 STATIC rbusHandle_t rbus_handle;
 
@@ -522,8 +523,7 @@ int rbus_getApAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t*
  * @brief Fetch MLO associated device diagnostics from X_RDK_MloDiagData TR181.
  *        This is a separate TR181 path specifically for MLO devices.
  */
-int rbus_getMloAssociatedDeviceDiagnosticResult(int index, mlo_assoc_dev_t **mlo_dev, 
-                                                 uint32_t *mloDevCount, char **vapIndex)
+int rbus_getMloAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t **mlo_dev, wifi_mlo_assoc_dev_data **mlo_data, uint32_t *mloDevCount)
 {
     int rc;
     rbusValue_t mloDevVal = NULL;
@@ -532,7 +532,7 @@ int rbus_getMloAssociatedDeviceDiagnosticResult(int index, mlo_assoc_dev_t **mlo
     /* Initialize outputs */
     if (mlo_dev) *mlo_dev = NULL;
     if (mloDevCount) *mloDevCount = 0;
-    if (vapIndex) *vapIndex = NULL;
+    if (mlo_data) *mlo_data = NULL;
 
     if(!rbusInitializedCheck())
     {
@@ -564,34 +564,7 @@ int rbus_getMloAssociatedDeviceDiagnosticResult(int index, mlo_assoc_dev_t **mlo
             rbusValue_Release(mloDevVal);
             mloDevVal = NULL;
         }
-
-        /* Fallback to read from file for testing */
-        FILE *fp = fopen("/tmp/harvester_test_mlo.json", "r");
-        if (fp != NULL)
-        {
-             fseek(fp, 0, SEEK_END);
-             long fsize = ftell(fp);
-             fseek(fp, 0, SEEK_SET);
-
-             char *string = malloc(fsize + 1);
-             if (string)
-             {
-                 fread(string, 1, fsize, fp);
-                 string[fsize] = 0;
-                 CcspHarvesterTrace(("RDK_LOG_INFO, Harvester %s: Read MLO data from fallback file /tmp/harvester_test_mlo.json\n", __FUNCTION__));
-                 mloDevDataStr = string;
-             }
-             fclose(fp);
-        }
-        else
-        {
-             CcspHarvesterTrace(("RDK_LOG_ERROR, Harvester %s: Failed to open fallback file /tmp/harvester_test_mlo.json\n", __FUNCTION__));
-        }
-
-        if (mloDevDataStr == NULL)
-        {
-             return 1;
-        }
+        return 1;
     }
     else
     {
@@ -626,7 +599,7 @@ int rbus_getMloAssociatedDeviceDiagnosticResult(int index, mlo_assoc_dev_t **mlo
     }
 
     /* Parse the MLO JSON using our MLO parser */
-    int parseRet = mlo_parseAssociatedDeviceDiagnostics(jsonVal, mlo_dev, mloDevCount, vapIndex);
+    int parseRet = mlo_parseAssociatedDeviceDiagnostics(jsonVal, mlo_dev, mlo_data, mloDevCount);
     
     if(mloDevVal) rbusValue_Release(mloDevVal);
     cJSON_Delete(jsonVal);

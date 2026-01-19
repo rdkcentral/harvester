@@ -254,6 +254,15 @@
                       ],
                       "doc": "SSID name associated with this interface [TR-181: Device.WiFi.SSID.{i}.SSID]",
                       "default": null
+                    },
+                    {
+                      "name": "mld_enable",
+                      "type": [
+                        "null",
+                        "boolean"
+                      ],
+                      "doc": "Indicates whether MLO is enabled for this device",
+                      "default": null
                     }
                   ]
                 }
