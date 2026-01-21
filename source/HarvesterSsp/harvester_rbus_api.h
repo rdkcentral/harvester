@@ -96,7 +96,7 @@ int rbus_getUInt32Value(ULONG * value, char * path);
  *
  * @return status 0 for success or 1 for failure
  */
-int rbus_getApAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t** dev, uint32_t *assocDevCount);
+int rbus_getApAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t** dev, wifi_mlo_associated_dev_t** mlo_dev, uint32_t *assocDevCount);
 
 /**
  * @brief To Fetch the required RadioTrafficStats values using Rbus.

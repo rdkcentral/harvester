@@ -168,10 +168,11 @@ int rbus_getUInt32Value(ULONG * value, char * path)
     return 0;
 }
 
-int rbus_getApAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t** associated_dev, uint32_t *assocDevCount)
+int rbus_getApAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t** associated_dev, wifi_mlo_associated_dev_t **mlo_associated_dev, uint32_t *assocDevCount)
 {
     int rc, count = 0, i=0;
     wifi_associated_dev_t *dev=NULL;
+    wifi_mlo_associated_dev_t *mlo_dev=NULL;
     rbusValue_t assocDevVal = NULL;
 
     if(!rbusInitializedCheck())
@@ -258,6 +259,8 @@ int rbus_getApAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t*
 
     				dev = (wifi_associated_dev_t *)calloc(*assocDevCount, sizeof(wifi_associated_dev_t));
     				*associated_dev = dev;
+                    mlo_dev = (wifi_mlo_associated_dev_t *)calloc(*assocDevCount, sizeof(wifi_mlo_associated_dev_t));
+                    *mlo_associated_dev = mlo_dev;
 
         			for(count = 0; count < *assocDevCount; count++)
         			{
@@ -265,10 +268,19 @@ int rbus_getApAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t*
 
             				if(devData != NULL)
             				{
+                             CcspHarvesterTrace(("RDK_LOG_DEBUG, After rbusValue_GetString\n"));
+                             if(cJSON_GetObjectItem(devData, "MLDEnable") != NULL)
+                             {
+                                bool MLDStatus  = (strcmp(cJSON_GetObjectItem(devData, "MLDEnable")->valuestring, "1") == 0) ? true: false;
+                                mlo_dev[count].isMLDEnabled = MLDStatus;
+                                CcspHarvesterTrace(("RDK_LOG_INFO, Printing mlo_dev[%d] cli_MLDStatus %s i %d\n", count, (mlo_dev[count].isMLDEnabled == 1)? "true": "false", i));
+                             }
+
+                             if(mlo_dev[count].isMLDEnabled == false)
+                             {
                             			if(cJSON_GetObjectItem(devData, "MAC") != NULL)
                             			{
                                 			char * mac = cJSON_GetObjectItem(devData, "MAC")->valuestring;
-                                                        CcspHarvesterTrace(("RDK_LOG_DEBUG, After rbusValue_GetString\n"));
                                 			if(mac != NULL)
                                 			{
                                     				sscanf(mac, "%2x%2x%2x%2x%2x%2x",
@@ -278,9 +290,36 @@ int rbus_getApAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t*
 						            (unsigned int *)&dev[count].cli_MACAddress[3],
 						            (unsigned int *)&dev[count].cli_MACAddress[4],
 						            (unsigned int *)&dev[count].cli_MACAddress[5]);
-                                                            CcspHarvesterTrace(("RDK_LOG_DEBUG, Printing dev[%d] Inside Mac %s, i %d \n", count, mac, i));
+                                                            CcspHarvesterTrace(("RDK_LOG_INFO, Printing dev[%d] Inside Mac %s, i %d \n", count, mac, i));
                                 			}
                              			}
+                             }
+                             else
+                             {
+                            			if(cJSON_GetObjectItem(devData, "MLDMAC") != NULL)
+                            			{
+                                			char * mac = cJSON_GetObjectItem(devData, "MLDMAC")->valuestring;
+                                			if(mac != NULL)
+                                			{
+                                    				sscanf(mac, "%2x%2x%2x%2x%2x%2x",
+						            (unsigned int *)&dev[count].cli_MACAddress[0],
+						            (unsigned int *)&dev[count].cli_MACAddress[1],
+						            (unsigned int *)&dev[count].cli_MACAddress[2],
+						            (unsigned int *)&dev[count].cli_MACAddress[3],
+						            (unsigned int *)&dev[count].cli_MACAddress[4],
+						            (unsigned int *)&dev[count].cli_MACAddress[5]);
+                                                            CcspHarvesterTrace(("RDK_LOG_INFO, Printing dev[%d] Inside MLDMac %s, i %d \n", count, mac, i));
+                                			}
+                             			}
+                             }
+
+                             if(cJSON_GetObjectItem(devData, "AssociationLink") != NULL)
+                             {
+                                bool AssociationLinkState = (strcmp(cJSON_GetObjectItem(devData, "AssociationLink")->valuestring,"1") == 0) ? true : false;
+                                mlo_dev[count].AssociationLink = AssociationLinkState;
+                               CcspHarvesterTrace(("RDK_LOG_INFO, Printing dev[%d] AssociationLink %s i %d\n", count, (mlo_dev[count].AssociationLink == 1)? "true": "false", i));
+                             }
+
                              if(cJSON_GetObjectItem(devData, "AuthenticationState") != NULL)
                              {
                                 bool authState = (strcmp(cJSON_GetObjectItem(devData, "AuthenticationState")->valuestring,"1") == 0) ? true : false;

@@ -225,6 +225,7 @@ void harvester_report_associateddevices(struct associateddevicedata *head, char*
   int numElements = 0;
   int numDevices = 0;
   wifi_associated_dev_t *ps = NULL;
+  wifi_mlo_associated_dev_t *mlo_ps = NULL;  
   struct associateddevicedata* ptr = head;
   avro_writer_t writer;
   char * serviceName = "harvester";
@@ -438,7 +439,7 @@ void harvester_report_associateddevices(struct associateddevicedata *head, char*
 
   for (i = 0; i < numElements; i++)
   {
-    for (j = 0, ps = ptr->devicedata; j < ptr->numAssocDevices; j++, ps++)
+    for (j = 0, ps = ptr->devicedata, mlo_ps = ptr->mlodevicedata; j < ptr->numAssocDevices; j++, ps++, mlo_ps++)
     {
 
       CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Current Link List Ptr = [0x%lx], numDevices = %d\n", (ulong)ptr, numDevices ));
@@ -518,7 +519,7 @@ void harvester_report_associateddevices(struct associateddevicedata *head, char*
       if ( CHK_AVRO_ERR ) CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, %s\n", avro_strerror()));
       avro_value_set_fixed(&drField, CpeMacid, 6);
       pMac = (unsigned char*)CpeMacid;
-      CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, interface_mac = 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n", pMac[0], pMac[1], pMac[2], pMac[3], pMac[4], pMac[5] ));
+      CcspHarvesterConsoleTrace(("RDK_LOG_INFO, interface_mac = 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n", pMac[0], pMac[1], pMac[2], pMac[3], pMac[4], pMac[5] ));
       if ( CHK_AVRO_ERR ) CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, %s\n", avro_strerror()));
 
       //interface parameters block
@@ -657,10 +658,30 @@ void harvester_report_associateddevices(struct associateddevicedata *head, char*
       avro_value_get_by_name(&optional, "ssid", &drField, NULL);
       if ( CHK_AVRO_ERR ) CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, %s\n", avro_strerror()));
       avro_value_set_branch(&drField, 1, &optional);
-      CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, ssid = \"%s\"\n", ptr->sSidName ));
+      CcspHarvesterConsoleTrace(("RDK_LOG_INFO, ssid = \"%s\"\n", ptr->sSidName ));
       CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, ssid\tType: %d\n", avro_value_get_type(&optional)));
       avro_value_set_string(&optional, ptr->sSidName);
       if ( CHK_AVRO_ERR ) CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, %s\n", avro_strerror()));
+
+      // mld_enable
+      avro_value_get_by_name(&dr, "interface_parameters", &drField, NULL);
+      if ( CHK_AVRO_ERR ) CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, %s\n", avro_strerror()));
+      avro_value_set_branch(&drField, 1, &optional);
+      avro_value_get_by_name(&optional, "mld_enable", &drField, NULL);
+      if ( CHK_AVRO_ERR ) CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, %s\n", avro_strerror()));
+      avro_value_set_branch(&drField, 1, &optional);
+      avro_value_set_boolean(&optional, mlo_ps->isMLDEnabled);
+      CcspHarvesterConsoleTrace(("RDK_LOG_INFO, mld_enable serialized: %d\n", mlo_ps->isMLDEnabled));
+
+      // association_link
+      avro_value_get_by_name(&dr, "interface_parameters", &drField, NULL);
+      if ( CHK_AVRO_ERR ) CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, %s\n", avro_strerror()));
+      avro_value_set_branch(&drField, 1, &optional);
+      avro_value_get_by_name(&optional, "association_link", &drField, NULL);
+      if ( CHK_AVRO_ERR ) CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, %s\n", avro_strerror()));
+      avro_value_set_branch(&drField, 1, &optional);
+      avro_value_set_boolean(&optional, mlo_ps->AssociationLink);
+      CcspHarvesterConsoleTrace(("RDK_LOG_INFO, association_link serialized: %d\n", mlo_ps->AssociationLink));
 
       //interface metrics block
 

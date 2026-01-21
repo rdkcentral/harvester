@@ -78,7 +78,7 @@ void* StartAssociatedDeviceHarvesting( void *arg );
 #if !defined(UTC_ENABLE_ATOM) && !defined(_HUB4_PRODUCT_REQ_)
 static void _syscmd(FILE *f, char *retBuf, int retBufSize);
 #endif
-void add_to_list(struct associateddevicedata **headnode, char* ssid, ULONG devices, wifi_associated_dev_t* devicedata, char* freqband, ULONG channel, char* intfcmacid);
+void add_to_list(struct associateddevicedata **headnode, char* ssid, ULONG devices, wifi_associated_dev_t* devicedata, wifi_mlo_associated_dev_t* mlo_devicedata, char* freqband, ULONG channel, char* intfcmacid);
 void print_list( struct associateddevicedata *head );
 void delete_list( struct associateddevicedata *head );
 int GetWiFiApGetAssocDevicesData(int ServiceType, int wlanIndex, char* pSsid);
@@ -390,7 +390,7 @@ int getTimeOffsetFromUtc()
 #endif
 
 
-void add_to_list(struct associateddevicedata **headnode, char* ssid, ULONG devices, wifi_associated_dev_t* devicedata, char* freqband, ULONG channel, char* intfcmacid)
+void add_to_list(struct associateddevicedata **headnode, char* ssid, ULONG devices, wifi_associated_dev_t* devicedata, wifi_mlo_associated_dev_t* mlo_devicedata, char* freqband, ULONG channel, char* intfcmacid)
 {
     errno_t rc = -1;
     CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Harvester %s ENTER\n", __FUNCTION__ ));
@@ -411,6 +411,7 @@ void add_to_list(struct associateddevicedata **headnode, char* ssid, ULONG devic
         ptr->bssid = strdup(intfcmacid);
         ptr->numAssocDevices = devices;
         ptr->devicedata = devicedata;
+        ptr->mlodevicedata = mlo_devicedata;
         ptr->radioOperatingFrequencyBand = strdup(freqband); //Possible value 2.4Ghz and 5.0 Ghz
         ptr->radioChannel = channel;
         ptr->next = NULL;
@@ -493,6 +494,7 @@ void delete_list(  struct associateddevicedata *headnode )
         free(currnode->bssid);
         free(currnode->radioOperatingFrequencyBand);
         free(currnode->devicedata);
+        free(currnode->mlodevicedata);
         free(currnode);
         currnode = next;
     }
@@ -528,6 +530,7 @@ int GetWiFiApGetAssocDevicesData(int ServiceType, int wlanIndex, char* pSsid)
 
     BOOL enabled = FALSE;
     wifi_associated_dev_t *wifi_associated_dev_array = NULL;
+    wifi_mlo_associated_dev_t *wifi_mlo_associated_dev_array = NULL;
     UINT array_size = 0;
     int radioIndex = 0;
     char interfaceMAC[128] = {0};
@@ -614,7 +617,7 @@ int GetWiFiApGetAssocDevicesData(int ServiceType, int wlanIndex, char* pSsid)
     }
 
 #ifdef RDK_ONEWIFI
-    ret = rbus_getApAssociatedDeviceDiagnosticResult(wlanIndex+1, &wifi_associated_dev_array, &array_size);
+    ret = rbus_getApAssociatedDeviceDiagnosticResult(wlanIndex+1, &wifi_associated_dev_array, &wifi_mlo_associated_dev_array, &array_size);
 #else
     //hal would allocate the array
     ret = wifi_getApAssociatedDeviceDiagnosticResult(wlanIndex, &wifi_associated_dev_array, &array_size);
@@ -626,13 +629,13 @@ int GetWiFiApGetAssocDevicesData(int ServiceType, int wlanIndex, char* pSsid)
         if ( ServiceType == PUBLIC )
         {
             headnode = (struct associateddevicedata **)headnodepublic;
-            add_to_list((struct associateddevicedata **)&headnode,  pSsid, array_size, wifi_associated_dev_array, (char*)&freqband, channel, (char*)&interfaceMAC);
+            add_to_list((struct associateddevicedata **)&headnode,  pSsid, array_size, wifi_associated_dev_array, wifi_mlo_associated_dev_array, (char*)&freqband, channel, (char*)&interfaceMAC);
             headnodepublic = (struct associateddevicedata *)headnode; //Important - headnode only change when it is a NEW list
         }
         else
         {
             headnode = (struct associateddevicedata **)headnodeprivate;
-            add_to_list((struct associateddevicedata **)&headnode, pSsid, array_size, wifi_associated_dev_array, (char*)&freqband, channel, (char*)&interfaceMAC);
+            add_to_list((struct associateddevicedata **)&headnode, pSsid, array_size, wifi_associated_dev_array, wifi_mlo_associated_dev_array, (char*)&freqband, channel, (char*)&interfaceMAC);
             headnodeprivate = (struct associateddevicedata *)headnode; //Important - headnode only change when it is a NEW list
         }
 

@@ -23,12 +23,19 @@
 #include <sys/time.h>
 #include <wifi_hal.h>
 #include <pthread.h>
+#include <stdbool.h>
 
 #ifndef UNIT_TEST_DOCKER_SUPPORT
     #define STATIC                    static
 #else
     #define STATIC
 #endif
+
+typedef struct wifi_mlo_associated_dev_t
+{
+    bool isMLDEnabled;
+    bool AssociationLink;
+}wifi_mlo_associated_dev_t;
 
 struct associateddevicedata
 {
@@ -39,6 +46,7 @@ char* radioOperatingFrequencyBand; //Possible value 2.4Ghz and 5.0 Ghz
 ULONG radioChannel;  // Possible Value between 1-11
 ULONG numAssocDevices;
 wifi_associated_dev_t* devicedata;
+wifi_mlo_associated_dev_t *mlodevicedata;
 
 struct associateddevicedata *next;
 };
