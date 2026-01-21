@@ -22,9 +22,7 @@
 
 #include "ansc_platform.h"
 #include "harvester_avro.h"
-#include "harvester_mlo.h"
 #include <rbus/rbus.h>
-#include "harvester_associated_devices.h"
 
 /**
  * @brief Gets the rbus_handle for harvester.
@@ -127,29 +125,4 @@ int rbus_wifi_getRadioTrafficStats2(int radioIndex, wifi_radioTrafficStats2_t *o
  * @return status 0 for success or 1 for failure
  */
 int rbus_wifi_getNeighboringWiFiDiagnosticResult2(bool *executed, wifi_neighbor_ap2_t **neighbor_ap_array, UINT *array_size);
-
-/**
- * @brief To Fetch MLO associated device diagnostics from new X_RDK_MloDiagData TR181.
- *
- * @param[in] index SSID index value.
- *
- * @param[out] mlo_dev Array of MLO device structures.
- *
- * @param[out] mloDevCount Number of MLO devices.
- *
- * @return status 0 for success, 1 for failure
- */
-
-int rbus_getMloAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t **mlo_dev, bool **mld_enable_list, char ***band_list, uint32_t *mloDevCount);
-
-/**
- * To persist TR181 parameter values in PSM DB.
- */
-int rbus_StoreValueIntoPsmDB(char *paramName, char *value);
-
-/**
- * To fetch TR181 parameter values from PSM DB.
- */
-int rbus_GetValueFromPsmDB( char* paramName, char** paramValue);
-
 #endif
