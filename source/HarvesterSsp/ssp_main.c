@@ -161,6 +161,41 @@ int  cmd_dispatch(int  command)
              {
                  fprintf(stderr, "RDK_LOG_INFO, Registered Harvester component '%s' with RBUS ..\n", RBUS_HARVESTER_COMPONENT_NAME);
              }
+
+             if(rbusInitializedCheck())
+             {
+                 if(regHarvesterDataModel() != -1)
+                 {
+                    CcspHarvesterTrace(("RDK_LOG_INFO, %s: Harvester Data Model registered successfully\n", __FUNCTION__));
+                 }
+                 else
+                 {
+                    CcspHarvesterTrace(("RDK_LOG_ERROR, %s: Harvester Data Model registration failed\n", __FUNCTION__));
+                 }
+                 /* Load initial value from PSM */
+                 rbusError_t ret = RBUS_ERROR_SUCCESS;
+                 char *tmpchar = NULL;
+                 ret = rbus_GetValueFromPsmDB(HARVESTER_MLO_RFC_PARAM, &tmpchar);
+                 if (ret == RBUS_ERROR_SUCCESS && tmpchar != NULL)
+                 {
+                    if ((strcmp(tmpchar, "true") == 0) || (strcmp(tmpchar, "TRUE") == 0))
+                    {
+                        set_HarvesterMLORfcEnable(true);
+                    }
+                    else
+                    {
+                        set_HarvesterMLORfcEnable(false);
+                    }
+                    free(tmpchar);
+                    CcspHarvesterTrace(("RDK_LOG_INFO, %s: Loaded MLO RFC value from PSM = %d\n", __FUNCTION__, get_HarvesterMLORfcEnable()));
+                 }
+                 else
+                 {
+                    /* Default to false if PSM value doesn't exist */
+                    set_HarvesterMLORfcEnable(false);
+                    CcspHarvesterTrace(("RDK_LOG_INFO, %s: MLO RFC PSM value not found, defaulting to false\n", __FUNCTION__));
+                 }
+                }
         #endif
 
             returnStatus = ssp_create();
@@ -233,6 +268,17 @@ int msgBusInit(const char *name)
     breakpad_ExceptionHandler();
 #endif /* * INCLUDE_BREAKPAD */
 
+#ifdef FEATURE_SUPPORT_RDKLOG
+    int ret = rdk_logger_init(DEBUG_INI_NAME);
+    if(ret == 0)
+    {
+        CcspHarvesterTrace(("RDK_LOG_INFO, rdk-logger initialzed!\n"));
+    }
+    else
+    {
+        CcspHarvesterTrace(("RDK_LOG_ERROR, Failed to initialize rdk-logger\n"));
+    }
+#endif
     retc = cmd_dispatch('e');
     if(retc != 0)
     {
@@ -248,19 +294,6 @@ int msgBusInit(const char *name)
         fprintf(stderr, "Cdm_Init: %s\n", Cdm_StrError(err));
         exit(1);
     }
-    
-    #ifdef FEATURE_SUPPORT_RDKLOG
-        int ret = rdk_logger_init(DEBUG_INI_NAME);
-        if(ret == 0)
-        {
-            CcspHarvesterTrace(("RDK_LOG_INFO, rdk-logger initialzed!\n"));
-        }
-        else
-        {
-            CcspHarvesterTrace(("RDK_LOG_ERROR, Failed to initialize rdk-logger\n"));
-        }
-    #endif
-    
     v_secure_system("touch /tmp/harvester_initialized");
     printf("Inside msgBusInit : /tmp/harvester_initialized created\n");
     CcspTraceInfo(("RDK_LOG_WARN, HARV : /tmp/harvester_initialized created\n"));

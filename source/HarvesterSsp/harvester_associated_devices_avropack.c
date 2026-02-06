@@ -38,8 +38,13 @@
 #define SCHEMA_ID_LENGTH  32
 #define WRITER_BUF_SIZE   1024 * 30 // 30K
 
+// MLO_HASH - 9cfd8cf627d17236db769dc87aa0b08c
 // HASH - a0fe2a90307541ad0b03411f52ccfd07
 // UUID - ec57a5b6-b167-4623-baff-399f063bd56a
+
+uint8_t MLO_HASH[16] = {0x9c, 0xfd, 0x8c, 0xf6, 0x27, 0xd1, 0x72, 0x36,
+                        0xdb, 0x76, 0x9d, 0xc8, 0x7a, 0xa0, 0xb0, 0x8c
+                       };
 
 uint8_t HASH[16] = {0xa0, 0xfe, 0x2a, 0x90, 0x30, 0x75, 0x41, 0xad,
                     0x0b, 0x03, 0x41, 0x1f, 0x52, 0xcc, 0xfd, 0x07
@@ -74,6 +79,7 @@ BOOL schema_file_parsed = FALSE;
 size_t AvroSerializedSize;
 size_t OneAvroSerializedSize;
 char AvroSerializedBuf[ WRITER_BUF_SIZE ];
+extern bool g_isMLORfcEnabled;
 
 char* GetIDWSchemaBuffer()
 {
@@ -200,7 +206,14 @@ avro_writer_t prepare_writer()
     ERR_CHK(rc);
     return writer;
   }
+  if(g_isMLORfcEnabled == false)
+  {
   rc = memcpy_s(&AvroSerializedBuf[ MAGIC_NUMBER_SIZE + sizeof(UUID) ], sizeof(AvroSerializedBuf)-MAGIC_NUMBER_SIZE-sizeof(UUID), HASH, sizeof(HASH));
+  }
+  else
+  {
+  rc = memcpy_s(&AvroSerializedBuf[ MAGIC_NUMBER_SIZE + sizeof(UUID) ], sizeof(AvroSerializedBuf)-MAGIC_NUMBER_SIZE-sizeof(UUID), MLO_HASH, sizeof(MLO_HASH));
+  }
   if(rc != EOK)
   {
     ERR_CHK(rc);
@@ -225,6 +238,7 @@ void harvester_report_associateddevices(struct associateddevicedata *head, char*
   int numElements = 0;
   int numDevices = 0;
   wifi_associated_dev_t *ps = NULL;
+  wifi_mlo_associated_dev_t *mlo_ps = NULL;  
   struct associateddevicedata* ptr = head;
   avro_writer_t writer;
   char * serviceName = "harvester";
@@ -236,6 +250,7 @@ void harvester_report_associateddevices(struct associateddevicedata *head, char*
   int ind = -1;
   size_t strsize2_4GHZ = 0;
   size_t strsize5GHZ = 0;
+  size_t skippedDevices = 0;
 #ifdef WIFI_HAL_VERSION_3
   size_t strsize6GHZ = 0;
 #endif
@@ -438,8 +453,16 @@ void harvester_report_associateddevices(struct associateddevicedata *head, char*
 
   for (i = 0; i < numElements; i++)
   {
-    for (j = 0, ps = ptr->devicedata; j < ptr->numAssocDevices; j++, ps++)
+    for (j = 0, ps = ptr->devicedata, mlo_ps = ptr->mlodevicedata; j < ptr->numAssocDevices; j++, ps++, mlo_ps++)
     {
+      // Skip processing MLD clients if Harvester MLO RFC feature is turned off
+      if((g_isMLORfcEnabled == false) && (mlo_ps->isMLDEnabled == true))
+      {
+        pMac = (unsigned char*)ps->cli_MACAddress;
+        CcspHarvesterTrace(("RDK_LOG_ERROR, Harvester MLO RFC disabled; skipped avro pack for frequency_band=%s, MLD client mac_address=0x%02X:0x%02X:0x%02X:0x%02X:0x%02X:0x%02X\n", ptr->radioOperatingFrequencyBand, pMac[0], pMac[1], pMac[2], pMac[3], pMac[4], pMac[5]));
+        skippedDevices++;
+        continue;
+      }
 
       CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Current Link List Ptr = [0x%lx], numDevices = %d\n", (ulong)ptr, numDevices ));
       CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, \tDevice entry #: %d\n", i + 1));
@@ -662,6 +685,31 @@ void harvester_report_associateddevices(struct associateddevicedata *head, char*
       avro_value_set_string(&optional, ptr->sSidName);
       if ( CHK_AVRO_ERR ) CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, %s\n", avro_strerror()));
 
+      if(g_isMLORfcEnabled == true)
+      {
+        pMac = (unsigned char*)ps->cli_MACAddress;
+        CcspHarvesterTrace(("RDK_LOG_INFO, frequency_band:%s mld_enable=%d association_link=%d mac_address=0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",ptr->radioOperatingFrequencyBand, mlo_ps->isMLDEnabled, mlo_ps->AssociationLink, pMac[0], pMac[1], pMac[2], pMac[3], pMac[4], pMac[5]));
+        // mld_enable
+        avro_value_get_by_name(&dr, "interface_parameters", &drField, NULL);
+        if ( CHK_AVRO_ERR ) CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, %s\n", avro_strerror()));
+        avro_value_set_branch(&drField, 1, &optional);
+        avro_value_get_by_name(&optional, "mld_enable", &drField, NULL);
+        if ( CHK_AVRO_ERR ) CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, %s\n", avro_strerror()));
+        avro_value_set_branch(&drField, 1, &optional);
+        avro_value_set_boolean(&optional, mlo_ps->isMLDEnabled);
+        CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, mld_enable serialized: %d\n", mlo_ps->isMLDEnabled));
+
+        // association_link
+        avro_value_get_by_name(&dr, "interface_parameters", &drField, NULL);
+        if ( CHK_AVRO_ERR ) CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, %s\n", avro_strerror()));
+        avro_value_set_branch(&drField, 1, &optional);
+        avro_value_get_by_name(&optional, "association_link", &drField, NULL);
+        if ( CHK_AVRO_ERR ) CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, %s\n", avro_strerror()));
+        avro_value_set_branch(&drField, 1, &optional);
+        avro_value_set_boolean(&optional, mlo_ps->AssociationLink);
+        CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, association_link serialized: %d\n", mlo_ps->AssociationLink));
+      }
+
       //interface metrics block
 
       //WIFI - authenticated
@@ -838,8 +886,9 @@ void harvester_report_associateddevices(struct associateddevicedata *head, char*
       // All done with schema, next entry if any
 
     }
+    CcspHarvesterTrace(("RDK_LOG_INFO,Total number of associated devices connected to %s radio = %lu, Number of associated devices data packed for sending = %lu\n", ptr->radioOperatingFrequencyBand, ptr->numAssocDevices,ptr->numAssocDevices-skippedDevices));
     ptr = ptr->next; // next link list
-
+    skippedDevices = 0; // reset skipped device count for next radio
     /* check for writer size, if buffer is almost full, skip trailing linklist */
     avro_value_sizeof(&adr, &AvroSerializedSize);
     OneAvroSerializedSize = ( OneAvroSerializedSize == 0 ) ? AvroSerializedSize : OneAvroSerializedSize;

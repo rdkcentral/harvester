@@ -24,6 +24,44 @@
 #include "harvester_avro.h"
 #include <rbus/rbus.h>
 
+#define HARVESTER_MLO_RFC_PARAM "Device.DeviceInfo.X_RDKCENTRAL-COM_Report.InterfaceDevicesWifi.MloRfcEnable"
+
+/**
+ * @brief Get MLO RFC enable status
+ * @return true if MLO harvesting is enabled, false otherwise
+ */
+bool get_HarvesterMLORfcEnable(void);
+
+/**
+ * @brief Set MLO RFC enable status and persist to PSM
+ */
+int set_HarvesterMLORfcEnable(bool bValue);
+
+/**
+ * @brief Initialize and register MLO RFC RBUS data elements
+ * @return 0 for success, 1 for failure
+ */
+int regHarvesterDataModel(void);
+
+/**
+ * @brief Determine if the MLO RFC configuration flag is enabled
+ *
+ * This function checks the runtime configuration to verify whether
+ * MLO RFC-controlled functionality should be active.
+ *
+ * @return true if MLO RFC is enabled, false if disabled
+ */
+
+ /**
+ * To persist TR181 parameter values in PSM DB.
+ */
+int rbus_StoreValueIntoPsmDB(char *paramName, char *value);
+
+/**
+ * To fetch TR181 parameter values from PSM DB.
+ */
+int rbus_GetValueFromPsmDB( char* paramName, char** paramValue);
+
 /**
  * @brief Gets the rbus_handle for harvester.
  *
@@ -96,7 +134,7 @@ int rbus_getUInt32Value(ULONG * value, char * path);
  *
  * @return status 0 for success or 1 for failure
  */
-int rbus_getApAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t** dev, uint32_t *assocDevCount);
+int rbus_getApAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t** dev, wifi_mlo_associated_dev_t** mlo_dev, uint32_t *assocDevCount);
 
 /**
  * @brief To Fetch the required RadioTrafficStats values using Rbus.

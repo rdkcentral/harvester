@@ -40,8 +40,14 @@
 #include "secure_wrapper.h"
 #include "harvester_rbus_api.h"
 #include <cJSON.h>
+#include <pthread.h>
+
+pthread_mutex_t mlorfc_mut= PTHREAD_MUTEX_INITIALIZER;
 
 STATIC rbusHandle_t rbus_handle;
+
+/* Global variable for MLO RFC enable status */
+static bool g_MLORfcEnabled = false;
 
 rbusHandle_t get_rbus_handle(void)
 {
@@ -168,10 +174,11 @@ int rbus_getUInt32Value(ULONG * value, char * path)
     return 0;
 }
 
-int rbus_getApAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t** associated_dev, uint32_t *assocDevCount)
+int rbus_getApAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t** associated_dev, wifi_mlo_associated_dev_t **mlo_associated_dev, uint32_t *assocDevCount)
 {
     int rc, count = 0, i=0;
     wifi_associated_dev_t *dev=NULL;
+    wifi_mlo_associated_dev_t *mlo_dev=NULL;
     rbusValue_t assocDevVal = NULL;
 
     if(!rbusInitializedCheck())
@@ -258,6 +265,8 @@ int rbus_getApAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t*
 
     				dev = (wifi_associated_dev_t *)calloc(*assocDevCount, sizeof(wifi_associated_dev_t));
     				*associated_dev = dev;
+                    mlo_dev = (wifi_mlo_associated_dev_t *)calloc(*assocDevCount, sizeof(wifi_mlo_associated_dev_t));
+                    *mlo_associated_dev = mlo_dev;
 
         			for(count = 0; count < *assocDevCount; count++)
         			{
@@ -265,6 +274,38 @@ int rbus_getApAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t*
 
             				if(devData != NULL)
             				{
+                                    if(cJSON_GetObjectItem(devData, "MLDEnable") != NULL)
+                                    {
+                                        mlo_dev[count].isMLDEnabled = (strcmp(cJSON_GetObjectItem(devData, "MLDEnable")->valuestring, "1") == 0) ? true: false;;
+                                        CcspHarvesterTrace(("RDK_LOG_DEBUG, Printing mlo_dev[%d] cli_MLDStatus %s i %d\n", count, mlo_dev[count].isMLDEnabled ? "true": "false", i));
+                                    }
+
+                                    if (cJSON_GetObjectItem(devData, "AssociationLink") != NULL)
+                                    {
+                                        mlo_dev[count].AssociationLink = (strcmp(cJSON_GetObjectItem(devData, "AssociationLink")->valuestring, "1") == 0) ? true: false;
+                                        CcspHarvesterTrace(("RDK_LOG_DEBUG, Printing dev[%d] AssociationLink %s i %d\n", count, mlo_dev[count].AssociationLink ? "true" : "false",i));
+                                    }
+
+                                    if(mlo_dev[count].isMLDEnabled == true)
+                                    {
+                                        if(cJSON_GetObjectItem(devData, "MLDMAC") != NULL)
+                                        {
+                                            char * mac = cJSON_GetObjectItem(devData, "MLDMAC")->valuestring;
+                                            if(mac != NULL)
+                                            {
+                                                sscanf(mac, "%2x%2x%2x%2x%2x%2x",
+                                                (unsigned int *)&dev[count].cli_MACAddress[0],
+                                                (unsigned int *)&dev[count].cli_MACAddress[1],
+                                                (unsigned int *)&dev[count].cli_MACAddress[2],
+                                                (unsigned int *)&dev[count].cli_MACAddress[3],
+                                                (unsigned int *)&dev[count].cli_MACAddress[4],
+                                                (unsigned int *)&dev[count].cli_MACAddress[5]);
+                                                    CcspHarvesterTrace(("RDK_LOG_DEBUG, Printing dev[%d] Inside MLDMac %s, i %d \n", count, mac, i));
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
                             			if(cJSON_GetObjectItem(devData, "MAC") != NULL)
                             			{
                                 			char * mac = cJSON_GetObjectItem(devData, "MAC")->valuestring;
@@ -281,6 +322,8 @@ int rbus_getApAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t*
                                                             CcspHarvesterTrace(("RDK_LOG_DEBUG, Printing dev[%d] Inside Mac %s, i %d \n", count, mac, i));
                                 			}
                              			}
+                                    }
+
                              if(cJSON_GetObjectItem(devData, "AuthenticationState") != NULL)
                              {
                                 bool authState = (strcmp(cJSON_GetObjectItem(devData, "AuthenticationState")->valuestring,"1") == 0) ? true : false;
@@ -853,6 +896,295 @@ int rbus_wifi_getNeighboringWiFiDiagnosticResult2(bool *executed, wifi_neighbor_
 
     // setting the flag to indicate the diagnostic is already run
     *executed = true;
+    return 0;
+}
+
+/**
+ * @brief RBUS Set handler for MLO RFC parameter
+ */
+static rbusError_t harvesterMLO_RfcSetHandler(rbusHandle_t handle, rbusProperty_t prop, rbusSetHandlerOptions_t* opts)
+{
+    (void)handle;
+    (void)opts;
+    const char *propertyName;
+    propertyName = rbusProperty_GetName(prop);
+    if (propertyName == NULL)
+    {
+        CcspHarvesterTrace(("RDK_LOG_ERROR, %s: Unable to handle get request for property\n", __FUNCTION__));
+        return RBUS_ERROR_INVALID_INPUT;
+    }
+
+    CcspHarvesterTrace(("RDK_LOG_DEBUG, %s: Property Name is %s\n", __FUNCTION__, propertyName));
+
+    if (strcmp(propertyName, HARVESTER_MLO_RFC_PARAM) != 0)
+    {
+        CcspHarvesterTrace(("RDK_LOG_ERROR, %s: Unexpected parameter %s\n", __FUNCTION__, propertyName));
+        return RBUS_ERROR_ELEMENT_DOES_NOT_EXIST;
+    }
+    
+    rbusValue_t paramValue_t = NULL;
+    rbusValueType_t type;
+
+    paramValue_t = rbusProperty_GetValue(prop);
+    if (paramValue_t == NULL)
+    {
+        CcspHarvesterTrace(("RDK_LOG_ERROR, %s: value is NULL\n", __FUNCTION__));
+        return RBUS_ERROR_INVALID_INPUT;
+    }
+
+    type = rbusValue_GetType(paramValue_t);
+    if (type != RBUS_BOOLEAN)
+    {
+        CcspHarvesterTrace(("RDK_LOG_ERROR, %s: Unexpected value type %d\n", __FUNCTION__, type));
+        return RBUS_ERROR_INVALID_INPUT;
+    }
+
+    bool paramVal = rbusValue_GetBoolean(paramValue_t);
+    CcspHarvesterTrace(("RDK_LOG_DEBUG, %s: Setting MLO RFC to %s\n", __FUNCTION__, paramVal ? "true" : "false"));
+
+    if (set_HarvesterMLORfcEnable(paramVal) != 0) {
+        CcspHarvesterTrace(("RDK_LOG_ERROR, %s: set_HarvesterMLORfcEnable failed\n", __FUNCTION__));
+        return RBUS_ERROR_BUS_ERROR;
+    }
+
+    CcspHarvesterTrace(("RDK_LOG_INFO, %s: MLO RFC set successfully to %s\n", 
+                        __FUNCTION__, paramVal ? "true" : "false"));
+    return RBUS_ERROR_SUCCESS;
+}
+
+
+/**
+ * @brief RBUS Get handler for MLO RFC parameter
+ */
+static rbusError_t harvesterMLO_RfcGetHandler(rbusHandle_t handle, rbusProperty_t property, rbusGetHandlerOptions_t* opts)
+{
+    (void)handle;
+    (void)opts;
+
+    const char *propertyName;
+    propertyName = rbusProperty_GetName(property);
+    if (propertyName == NULL)
+    {
+        CcspHarvesterTrace(("RDK_LOG_ERROR, %s: Unable to handle get request for property\n", __FUNCTION__));
+        return RBUS_ERROR_INVALID_INPUT;
+    }
+
+    CcspHarvesterTrace(("RDK_LOG_DEBUG, %s: Property Name is %s\n", __FUNCTION__, propertyName));
+
+    if (strcmp(propertyName, HARVESTER_MLO_RFC_PARAM) != 0)
+    {
+        CcspHarvesterTrace(("RDK_LOG_ERROR, %s: Unexpected parameter %s\n", __FUNCTION__, propertyName));
+        return RBUS_ERROR_ELEMENT_DOES_NOT_EXIST;
+    }
+
+    rbusError_t retPsmGet = RBUS_ERROR_SUCCESS;
+    rbusValue_t value;
+    rbusValue_Init(&value);
+    char *tmpchar = NULL;
+
+    /* Get value from PSM DB */
+    retPsmGet = rbus_GetValueFromPsmDB(HARVESTER_MLO_RFC_PARAM, &tmpchar);
+    if (retPsmGet == RBUS_ERROR_SUCCESS)
+    {
+      if (tmpchar != NULL)
+      {
+          if ((strcmp(tmpchar, "true") == 0) || (strcmp(tmpchar, "TRUE") == 0))
+          {
+            g_MLORfcEnabled = true;
+          }
+          else
+          {
+            g_MLORfcEnabled = false;
+          }
+          free(tmpchar);
+      }
+      CcspHarvesterTrace(("RDK_LOG_DEBUG, %s: MLO RFC value from PSM = %d\n", __FUNCTION__, g_MLORfcEnabled));
+    }
+    else
+    {
+      CcspHarvesterTrace(("RDK_LOG_WARN, %s: PSM get failed ret %d, using cached value %d\n",__FUNCTION__, retPsmGet, g_MLORfcEnabled));
+    }
+
+    rbusValue_SetBoolean(value, g_MLORfcEnabled);
+    rbusProperty_SetValue(property, value);
+    rbusValue_Release(value);
+
+    CcspHarvesterTrace(("RDK_LOG_INFO, %s: Mlo Rfc value fetched is %s\n", __FUNCTION__, g_MLORfcEnabled ? "true" : "false"));
+    return RBUS_ERROR_SUCCESS;
+}
+
+/**
+ * @brief Set MLO RFC enable status and persist to PSM
+ */
+int set_HarvesterMLORfcEnable(bool bValue)
+{
+    // Updare global mlo rfc variable
+    g_MLORfcEnabled = bValue;
+
+    // Update PSM DB Value
+    rbusError_t retPsmSet = RBUS_ERROR_SUCCESS;
+    char *buf = NULL;
+
+    buf = bValue ? strdup("true") : strdup("false");
+    if (buf == NULL)
+    {
+        CcspHarvesterTrace(("RDK_LOG_ERROR, %s: strdup failed\n", __FUNCTION__));
+        return 1;
+    }
+
+    retPsmSet = rbus_StoreValueIntoPsmDB(HARVESTER_MLO_RFC_PARAM, buf);
+    if (retPsmSet != RBUS_ERROR_SUCCESS)
+    {
+        CcspHarvesterTrace(("RDK_LOG_ERROR, %s: PSM set failed ret %d for parameter %s and value %s\n", __FUNCTION__, retPsmSet, HARVESTER_MLO_RFC_PARAM, buf));
+        free(buf);
+        return 1;
+    }
+
+    CcspHarvesterTrace(("RDK_LOG_INFO, %s: PSM set success for parameter %s and value %s\n", __FUNCTION__, HARVESTER_MLO_RFC_PARAM, buf));
+    free(buf);
+    return 0;
+}
+
+/**
+ * @brief Get MLO RFC enable status
+ */
+bool get_HarvesterMLORfcEnable(void)
+{
+    bool isRfc = false;
+    pthread_mutex_lock(&mlorfc_mut);
+    isRfc = g_MLORfcEnabled;
+    pthread_mutex_unlock (&mlorfc_mut);
+    return isRfc;
+}
+
+
+/**
+ * To persist TR181 parameter values in PSM DB.
+ */
+int rbus_StoreValueIntoPsmDB(char *paramName, char *value)
+{
+    rbusHandle_t rbus_handle = get_rbus_handle();
+    rbusObject_t inParams;
+    rbusObject_t outParams;
+    rbusValue_t setvalue;
+    int rc = RBUS_ERROR_SUCCESS;
+
+    if(!rbus_handle)
+    {
+        CcspHarvesterTrace(("RDK_LOG_ERROR, %s: failed as rbus_handle is empty\n", __FUNCTION__));
+        return 1;
+    }
+
+    rbusObject_Init(&inParams, NULL);
+    rbusValue_Init(&setvalue);
+    rbusValue_SetString(setvalue, value);
+    rbusObject_SetValue(inParams, paramName, setvalue);
+    rbusValue_Release(setvalue);
+
+    rc = rbusMethod_Invoke(rbus_handle, "SetPSMRecordValue()", inParams, &outParams);
+    rbusObject_Release(inParams);
+    if(rc != RBUS_ERROR_SUCCESS)
+    {
+        CcspHarvesterTrace(("RDK_LOG_ERROR, %s: SetPSMRecordValue failed with err %d: %s\n", __FUNCTION__, rc, rbusError_ToString(rc)));
+    }
+    else
+    {
+        CcspHarvesterTrace(("RDK_LOG_DEBUG, %s: SetPSMRecordValue is success\n", __FUNCTION__));
+        rbusObject_Release(outParams);
+        return 0;
+    }
+    return 1;
+}
+
+/**
+ * To fetch TR181 parameter values from PSM DB.
+ */
+int rbus_GetValueFromPsmDB( char* paramName, char** paramValue)
+{
+    rbusHandle_t rbus_handle = get_rbus_handle();
+    rbusObject_t inParams;
+    rbusObject_t outParams;
+    rbusValue_t setvalue;
+    int rc = RBUS_ERROR_SUCCESS;
+
+    if(!rbus_handle)
+    {
+        CcspHarvesterTrace(("RDK_LOG_ERROR, %s: failed as rbus_handle is empty\n", __FUNCTION__));
+        return 1;
+    }
+
+    rbusObject_Init(&inParams, NULL);
+    rbusValue_Init(&setvalue);
+    rbusValue_SetString(setvalue, "value");
+    rbusObject_SetValue(inParams, paramName, setvalue);
+    rbusValue_Release(setvalue);
+
+    rc = rbusMethod_Invoke(rbus_handle, "GetPSMRecordValue()", inParams, &outParams);
+    rbusObject_Release(inParams);
+    if(rc != RBUS_ERROR_SUCCESS)
+    {
+        CcspHarvesterTrace(("RDK_LOG_ERROR, %s: GetPSMRecordValue failed with err %d: %s\n", __FUNCTION__, rc, rbusError_ToString(rc)));
+    }
+    else
+    {
+        CcspHarvesterTrace(("RDK_LOG_DEBUG, %s: GetPSMRecordValue is success\n", __FUNCTION__));
+        rbusProperty_t prop = NULL;
+        rbusValue_t value = NULL;
+        const char *str_value = NULL;
+        prop = rbusObject_GetProperties(outParams);
+        while(prop)
+        {
+            value = rbusProperty_GetValue(prop);
+            if(value)
+            {
+                str_value = rbusValue_ToString(value,NULL,0);
+                if(str_value)
+                {
+                    CcspHarvesterTrace(("RDK_LOG_DEBUG, %s: Parameter Name : %s\n", __FUNCTION__, rbusProperty_GetName(prop)));
+                    CcspHarvesterTrace(("RDK_LOG_DEBUG, %s: Parameter Value fetched: %s\n", __FUNCTION__, str_value));
+                }
+            }
+            prop = rbusProperty_GetNext(prop);
+        }
+        if(str_value !=NULL)
+        {
+            *paramValue = strdup(str_value);
+            CcspHarvesterTrace(("RDK_LOG_DEBUG, %s: Requested param DB value [%s]\n", __FUNCTION__, *paramValue));
+        }
+        rbusObject_Release(outParams);
+        return 0;
+    }
+    return 1;
+}
+
+/**
+ * @brief Initialize and register MLO RFC RBUS data elements
+ */
+int regHarvesterDataModel()
+{
+    rbusError_t ret = RBUS_ERROR_SUCCESS;
+    rbusHandle_t handle = get_rbus_handle();
+
+
+    if (handle == NULL)
+    {
+        CcspHarvesterTrace(("RDK_LOG_ERROR, %s: rbus handle is NULL\n", __FUNCTION__));
+        return -1;
+    }
+
+    CcspHarvesterTrace(("RDK_LOG_INFO, %s: Registering MLO RFC parameter %s\n", __FUNCTION__, HARVESTER_MLO_RFC_PARAM));
+
+    rbusDataElement_t dataElements[1] = {
+      {HARVESTER_MLO_RFC_PARAM, RBUS_ELEMENT_TYPE_PROPERTY, {harvesterMLO_RfcGetHandler, harvesterMLO_RfcSetHandler, NULL, NULL, NULL, NULL}}
+    };
+
+    ret = rbus_regDataElements(handle, 1, dataElements);
+
+    if (ret != RBUS_ERROR_SUCCESS)
+    {
+        CcspHarvesterTrace(("RDK_LOG_ERROR, %s: rbus_regDataElements failed with error %d\n", __FUNCTION__, ret));
+        return -1;
+    }
     return 0;
 }
 // End of File
