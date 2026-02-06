@@ -499,6 +499,11 @@ int GetRadioNeighboringAPData(int radioIndex, char* radioIfName)
     } 
 
     CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Harvester %s EXIT \n", __FUNCTION__ ));
+    if (neighbor_ap_array)
+    {
+       free(neighbor_ap_array);
+       neighbor_ap_array = NULL;
+    }
     return ret;
 }
 
