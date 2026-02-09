@@ -314,10 +314,10 @@ TEST_F(HarvesterTestFixture, TestSuccessfulDataRetrieval) {
     BOOL enabled = TRUE;
     ULONG channel = 6;
     char freqband[] = "2.4GHz";
-    wifi_neighbor_ap2_t neighbor_ap_array[1];  
+    wifi_neighbor_ap2_t *neighbor_ap_array = (wifi_neighbor_ap2_t *)calloc(1, sizeof(wifi_neighbor_ap2_t));
     UINT array_size = 1;
 
-    
+  
     EXPECT_CALL(*g_WifiHalMock, wifi_getRadioEnable(radioIndex, testing::_))
         .WillOnce(testing::DoAll(testing::SetArgPointee<1>(enabled), testing::Return(0)));
 
