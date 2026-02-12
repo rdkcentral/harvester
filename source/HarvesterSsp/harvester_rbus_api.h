@@ -34,31 +34,25 @@ bool get_HarvesterMLORfcEnable(void);
 
 /**
  * @brief Set MLO RFC enable status and persist to PSM
+ * @return 0 on success, 1 on failure
  */
 int set_HarvesterMLORfcEnable(bool bValue);
 
 /**
  * @brief Initialize and register MLO RFC RBUS data elements
- * @return 0 for success, 1 for failure
+ * @return 0 for success, -1 for failure
  */
 int regHarvesterDataModel(void);
 
-/**
- * @brief Determine if the MLO RFC configuration flag is enabled
- *
- * This function checks the runtime configuration to verify whether
- * MLO RFC-controlled functionality should be active.
- *
- * @return true if MLO RFC is enabled, false if disabled
- */
-
  /**
  * To persist TR181 parameter values in PSM DB.
+ * @return status 0 for success or 1 for failure
  */
 int rbus_StoreValueIntoPsmDB(char *paramName, char *value);
 
 /**
  * To fetch TR181 parameter values from PSM DB.
+ * @return status 0 for success or 1 for failure
  */
 int rbus_GetValueFromPsmDB( char* paramName, char** paramValue);
 
@@ -128,6 +122,8 @@ int rbus_getUInt32Value(ULONG * value, char * path);
  *
  * @param[out] dev to store the wifi_associated_dev_t struct values.
  *
+ * @param[out] mlo_dev to store the wifi_mlo_associated_dev_t struct values.
+ * 
  * @param[out] assocDevCount to get the total number of client devices connected.
  *
  * @param[in] index to input the SSID index value.

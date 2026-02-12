@@ -90,6 +90,7 @@ static struct associateddevicedata *headnodepublic = NULL;
 extern ANSC_STATUS SetIDWPollingPeriodInNVRAM(ULONG pPollingVal);
 extern ANSC_STATUS SetIDWReportingPeriodInNVRAM(ULONG pReportingVal);
 extern void harvester_avro_cleanup();
+
 bool g_isMLORfcEnabled = false;
 char* GetCurrentTimeString()
 {
@@ -495,7 +496,8 @@ void delete_list(  struct associateddevicedata *headnode )
         free(currnode->bssid);
         free(currnode->radioOperatingFrequencyBand);
         free(currnode->devicedata);
-        free(currnode->mlodevicedata);
+        if(currnode->mlodevicedata != NULL)
+            free(currnode->mlodevicedata);
         free(currnode);
         currnode = next;
     }
@@ -620,6 +622,8 @@ int GetWiFiApGetAssocDevicesData(int ServiceType, int wlanIndex, char* pSsid)
 #ifdef RDK_ONEWIFI
     ret = rbus_getApAssociatedDeviceDiagnosticResult(wlanIndex+1, &wifi_associated_dev_array, &wifi_mlo_associated_dev_array, &array_size);
 #else
+    /* HAL will allocate wifi_associated_dev_array; initialize MLO array pointer explicitly */
+    wifi_mlo_associated_dev_array = NULL;
     //hal would allocate the array
     ret = wifi_getApAssociatedDeviceDiagnosticResult(wlanIndex, &wifi_associated_dev_array, &array_size);
 #endif
@@ -734,9 +738,12 @@ void* StartAssociatedDeviceHarvesting( void *arg )
         /* CID: 79303 OVERRUN - Out-of-bounds access
          * qtn-wifi component access the max buffer size as 512 bytes*/
         char ssid[STR_BUF_MAX] = {0};
-        g_isMLORfcEnabled = get_HarvesterMLORfcEnable();
 
 #ifdef RDK_ONEWIFI
+// g_isMLORfcEnabled is a snapshot of the global RFC state (g_MLORfcEnabled).
+// The snapshot is updated at the beginning of each interval and remains
+// unchanged for the entire iteration, even if the RFC state is updated during the iteration.
+        g_isMLORfcEnabled = get_HarvesterMLORfcEnable();
         snprintf(bufferIDR, sizeof(bufferIDR), "Device.WiFi.SSIDNumberOfEntries");
         ret = rbus_getUInt32Value(&output, bufferIDR);
 #else

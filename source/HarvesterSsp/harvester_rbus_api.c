@@ -264,9 +264,36 @@ int rbus_getApAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t*
     				}
 
     				dev = (wifi_associated_dev_t *)calloc(*assocDevCount, sizeof(wifi_associated_dev_t));
+    				if (dev == NULL)
+    				{
+    					CcspHarvesterTrace(("RDK_LOG_ERROR, Harvester %s: calloc failed for associated_dev\n", __FUNCTION__));
+    					if(assocDevVal != NULL)
+    					{
+    						rbusValue_Release(assocDevVal);
+    					}
+    					cJSON_Delete(jsonVal);
+    					*associated_dev = NULL;
+    					*mlo_associated_dev = NULL;
+    					*assocDevCount = 0;
+    					return 1;
+    				}
     				*associated_dev = dev;
-                    mlo_dev = (wifi_mlo_associated_dev_t *)calloc(*assocDevCount, sizeof(wifi_mlo_associated_dev_t));
-                    *mlo_associated_dev = mlo_dev;
+    				mlo_dev = (wifi_mlo_associated_dev_t *)calloc(*assocDevCount, sizeof(wifi_mlo_associated_dev_t));
+    				if (mlo_dev == NULL)
+      				{
+    					CcspHarvesterTrace(("RDK_LOG_ERROR, Harvester %s: calloc failed for mlo_associated_dev\n", __FUNCTION__));
+    					free(dev);
+    					if(assocDevVal != NULL)
+    					{
+    						rbusValue_Release(assocDevVal);
+    					}
+    					cJSON_Delete(jsonVal);
+    					*associated_dev = NULL;
+    					*mlo_associated_dev = NULL;
+    					*assocDevCount = 0;
+    					return 1;
+    				}
+    				*mlo_associated_dev = mlo_dev;
 
         			for(count = 0; count < *assocDevCount; count++)
         			{
@@ -274,38 +301,20 @@ int rbus_getApAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t*
 
             				if(devData != NULL)
             				{
-                                    if(cJSON_GetObjectItem(devData, "MLDEnable") != NULL)
+                                    cJSON *mldEnableItem = cJSON_GetObjectItem(devData, "MLDEnable");
+                                    if(cJSON_IsString(mldEnableItem) && (mldEnableItem->valuestring != NULL))
                                     {
-                                        mlo_dev[count].isMLDEnabled = (strcmp(cJSON_GetObjectItem(devData, "MLDEnable")->valuestring, "1") == 0) ? true: false;;
+                                        mlo_dev[count].isMLDEnabled = (strcmp(mldEnableItem->valuestring, "1") == 0) ? true : false;
                                         CcspHarvesterTrace(("RDK_LOG_DEBUG, Printing mlo_dev[%d] cli_MLDStatus %s i %d\n", count, mlo_dev[count].isMLDEnabled ? "true": "false", i));
                                     }
 
-                                    if (cJSON_GetObjectItem(devData, "AssociationLink") != NULL)
+                                    cJSON *associationLinkItem = cJSON_GetObjectItem(devData, "AssociationLink");
+                                    if(cJSON_IsString(associationLinkItem) && (associationLinkItem->valuestring != NULL))
                                     {
-                                        mlo_dev[count].AssociationLink = (strcmp(cJSON_GetObjectItem(devData, "AssociationLink")->valuestring, "1") == 0) ? true: false;
-                                        CcspHarvesterTrace(("RDK_LOG_DEBUG, Printing dev[%d] AssociationLink %s i %d\n", count, mlo_dev[count].AssociationLink ? "true" : "false",i));
+                                        mlo_dev[count].isAssociationLink = (strcmp(associationLinkItem->valuestring, "1") == 0) ? true : false;
+                                        CcspHarvesterTrace(("RDK_LOG_DEBUG, Printing dev[%d] AssociationLink %s i %d\n", count, mlo_dev[count].isAssociationLink ? "true" : "false",i));
                                     }
 
-                                    if(mlo_dev[count].isMLDEnabled == true)
-                                    {
-                                        if(cJSON_GetObjectItem(devData, "MLDMAC") != NULL)
-                                        {
-                                            char * mac = cJSON_GetObjectItem(devData, "MLDMAC")->valuestring;
-                                            if(mac != NULL)
-                                            {
-                                                sscanf(mac, "%2x%2x%2x%2x%2x%2x",
-                                                (unsigned int *)&dev[count].cli_MACAddress[0],
-                                                (unsigned int *)&dev[count].cli_MACAddress[1],
-                                                (unsigned int *)&dev[count].cli_MACAddress[2],
-                                                (unsigned int *)&dev[count].cli_MACAddress[3],
-                                                (unsigned int *)&dev[count].cli_MACAddress[4],
-                                                (unsigned int *)&dev[count].cli_MACAddress[5]);
-                                                    CcspHarvesterTrace(("RDK_LOG_DEBUG, Printing dev[%d] Inside MLDMac %s, i %d \n", count, mac, i));
-                                            }
-                                        }
-                                    }
-                                    else
-                                    {
                             			if(cJSON_GetObjectItem(devData, "MAC") != NULL)
                             			{
                                 			char * mac = cJSON_GetObjectItem(devData, "MAC")->valuestring;
@@ -322,8 +331,6 @@ int rbus_getApAssociatedDeviceDiagnosticResult(int index, wifi_associated_dev_t*
                                                             CcspHarvesterTrace(("RDK_LOG_DEBUG, Printing dev[%d] Inside Mac %s, i %d \n", count, mac, i));
                                 			}
                              			}
-                                    }
-
                              if(cJSON_GetObjectItem(devData, "AuthenticationState") != NULL)
                              {
                                 bool authState = (strcmp(cJSON_GetObjectItem(devData, "AuthenticationState")->valuestring,"1") == 0) ? true : false;
@@ -910,7 +917,7 @@ static rbusError_t harvesterMLO_RfcSetHandler(rbusHandle_t handle, rbusProperty_
     propertyName = rbusProperty_GetName(prop);
     if (propertyName == NULL)
     {
-        CcspHarvesterTrace(("RDK_LOG_ERROR, %s: Unable to handle get request for property\n", __FUNCTION__));
+        CcspHarvesterTrace(("RDK_LOG_ERROR, %s: Unable to handle set request for property\n", __FUNCTION__));
         return RBUS_ERROR_INVALID_INPUT;
     }
 
@@ -979,7 +986,8 @@ static rbusError_t harvesterMLO_RfcGetHandler(rbusHandle_t handle, rbusProperty_
 
     rbusError_t retPsmGet = RBUS_ERROR_SUCCESS;
     rbusValue_t value;
-    rbusValue_Init(&value);
+    bool mloRfcEnabled = false;
+
     char *tmpchar = NULL;
 
     /* Get value from PSM DB */
@@ -990,26 +998,40 @@ static rbusError_t harvesterMLO_RfcGetHandler(rbusHandle_t handle, rbusProperty_
       {
           if ((strcmp(tmpchar, "true") == 0) || (strcmp(tmpchar, "TRUE") == 0))
           {
+            pthread_mutex_lock(&mlorfc_mut);
             g_MLORfcEnabled = true;
+            pthread_mutex_unlock(&mlorfc_mut);
           }
           else
           {
+            pthread_mutex_lock(&mlorfc_mut);
             g_MLORfcEnabled = false;
+            pthread_mutex_unlock(&mlorfc_mut);
           }
+          CcspHarvesterTrace(("RDK_LOG_DEBUG, %s: MLO RFC value from PSM = %s\n", __FUNCTION__, tmpchar));
           free(tmpchar);
       }
-      CcspHarvesterTrace(("RDK_LOG_DEBUG, %s: MLO RFC value from PSM = %d\n", __FUNCTION__, g_MLORfcEnabled));
     }
     else
     {
-      CcspHarvesterTrace(("RDK_LOG_WARN, %s: PSM get failed ret %d, using cached value %d\n",__FUNCTION__, retPsmGet, g_MLORfcEnabled));
+        if (tmpchar)
+            free(tmpchar);
+        pthread_mutex_lock(&mlorfc_mut);
+        CcspHarvesterTrace(("RDK_LOG_WARN, %s: PSM get failed ret %d, using cached value %d\n",__FUNCTION__, retPsmGet, g_MLORfcEnabled));
+        pthread_mutex_unlock(&mlorfc_mut);
     }
 
-    rbusValue_SetBoolean(value, g_MLORfcEnabled);
+    /* Use cached in-memory value; PSM is read at init and on set */
+    pthread_mutex_lock(&mlorfc_mut);
+    mloRfcEnabled = g_MLORfcEnabled;
+    pthread_mutex_unlock(&mlorfc_mut);
+
+    rbusValue_Init(&value);
+    rbusValue_SetBoolean(value, mloRfcEnabled);
     rbusProperty_SetValue(property, value);
     rbusValue_Release(value);
 
-    CcspHarvesterTrace(("RDK_LOG_INFO, %s: Mlo Rfc value fetched is %s\n", __FUNCTION__, g_MLORfcEnabled ? "true" : "false"));
+    CcspHarvesterTrace(("RDK_LOG_INFO, %s: Mlo Rfc value fetched is %s\n", __FUNCTION__, mloRfcEnabled ? "true" : "false"));
     return RBUS_ERROR_SUCCESS;
 }
 
@@ -1018,9 +1040,6 @@ static rbusError_t harvesterMLO_RfcGetHandler(rbusHandle_t handle, rbusProperty_
  */
 int set_HarvesterMLORfcEnable(bool bValue)
 {
-    // Updare global mlo rfc variable
-    g_MLORfcEnabled = bValue;
-
     // Update PSM DB Value
     rbusError_t retPsmSet = RBUS_ERROR_SUCCESS;
     char *buf = NULL;
@@ -1039,8 +1058,12 @@ int set_HarvesterMLORfcEnable(bool bValue)
         free(buf);
         return 1;
     }
-
     CcspHarvesterTrace(("RDK_LOG_INFO, %s: PSM set success for parameter %s and value %s\n", __FUNCTION__, HARVESTER_MLO_RFC_PARAM, buf));
+
+    /* Update global MLO RFC variable under mutex to avoid data races */
+    pthread_mutex_lock(&mlorfc_mut);
+    g_MLORfcEnabled = bValue;
+    pthread_mutex_unlock(&mlorfc_mut);
     free(buf);
     return 0;
 }
@@ -1053,7 +1076,7 @@ bool get_HarvesterMLORfcEnable(void)
     bool isRfc = false;
     pthread_mutex_lock(&mlorfc_mut);
     isRfc = g_MLORfcEnabled;
-    pthread_mutex_unlock (&mlorfc_mut);
+    pthread_mutex_unlock(&mlorfc_mut);
     return isRfc;
 }
 
@@ -1146,13 +1169,19 @@ int rbus_GetValueFromPsmDB( char* paramName, char** paramValue)
             }
             prop = rbusProperty_GetNext(prop);
         }
-        if(str_value !=NULL)
+        if(str_value != NULL)
         {
             *paramValue = strdup(str_value);
+            if(*paramValue == NULL)
+            {
+                CcspHarvesterTrace(("RDK_LOG_ERROR, %s: strdup failed for parameter value\n", __FUNCTION__));
+                rbusObject_Release(outParams);
+                return 1;
+            }
             CcspHarvesterTrace(("RDK_LOG_DEBUG, %s: Requested param DB value [%s]\n", __FUNCTION__, *paramValue));
+            rbusObject_Release(outParams);
+            return 0;
         }
-        rbusObject_Release(outParams);
-        return 0;
     }
     return 1;
 }

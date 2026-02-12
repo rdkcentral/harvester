@@ -164,7 +164,7 @@ int  cmd_dispatch(int  command)
 
              if(rbusInitializedCheck())
              {
-                 if(regHarvesterDataModel() != -1)
+                 if(regHarvesterDataModel() == 0)
                  {
                     CcspHarvesterTrace(("RDK_LOG_INFO, %s: Harvester Data Model registered successfully\n", __FUNCTION__));
                  }
@@ -272,7 +272,7 @@ int msgBusInit(const char *name)
     int ret = rdk_logger_init(DEBUG_INI_NAME);
     if(ret == 0)
     {
-        CcspHarvesterTrace(("RDK_LOG_INFO, rdk-logger initialzed!\n"));
+        CcspHarvesterTrace(("RDK_LOG_INFO, rdk-logger initialized!\n"));
     }
     else
     {

@@ -34,7 +34,7 @@
 typedef struct wifi_mlo_associated_dev_t
 {
     bool isMLDEnabled;
-    bool AssociationLink;
+    bool isAssociationLink;
 }wifi_mlo_associated_dev_t;
 
 struct associateddevicedata
@@ -79,4 +79,5 @@ wifi_radioTrafficStats2_t* rtdata;
 extern void harvester_report_associateddevices(struct associateddevicedata *head, char* ServiceType);
 extern void harvester_report_neighboringap(struct neighboringapdata *head);
 extern void harvester_report_radiotraffic(struct radiotrafficdata *head);
+
 #endif /* !_HARVESTER_AVRO_H */
