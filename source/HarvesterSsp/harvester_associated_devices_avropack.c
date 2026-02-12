@@ -139,6 +139,16 @@ avro_writer_t prepare_writer()
   avro_writer_t writer = {0};
   long lSize = 0;
   errno_t rc = -1;
+  static bool previus_g_isMLORfcEnabled;
+  if(g_isMLORfcEnabled != previus_g_isMLORfcEnabled)
+  {
+    schema_file_parsed = FALSE; // reset to re-parse correct schema file based on MLO RFC feature state
+    previus_g_isMLORfcEnabled = g_isMLORfcEnabled;
+CcspHarvesterTrace(("RDK_LOG_INFO, Harvester %s: g_isMLORfcEnabled changed from %s to %s, resetting schema_file_parsed to FALSE\n",
+                           __FUNCTION__,
+                           previus_g_isMLORfcEnabled ? "true" : "false",
+                           g_isMLORfcEnabled ? "true" : "false"));    
+  }
 
   CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Harvester %s : ENTER \n", __FUNCTION__ ));
   CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Avro prepares to serialize data\n"));
@@ -148,8 +158,16 @@ avro_writer_t prepare_writer()
     FILE *fp;
 
     /* open schema file */
-    fp = fopen ( INTERFACE_DEVICES_WIFI_AVRO_FILENAME , "rb" );
-    if ( !fp ) perror( INTERFACE_DEVICES_WIFI_AVRO_FILENAME " doesn't exist."), exit(1);
+    if(g_isMLORfcEnabled == false)
+    {
+      fp = fopen ( INTERFACE_DEVICES_WIFI_AVRO_FILENAME , "rb" );
+      if ( !fp ) perror( INTERFACE_DEVICES_WIFI_AVRO_FILENAME " doesn't exist."), exit(1);
+    }     
+    else
+    {
+      fp = fopen ( INTERFACE_DEVICES_WIFI_MLO_AVRO_FILENAME , "rb" );
+      if ( !fp ) perror( INTERFACE_DEVICES_WIFI_MLO_AVRO_FILENAME " doesn't exist."), exit(1);
+    }
 
     /* seek through file and get file size*/
     fseek( fp , 0L , SEEK_END);

@@ -2,7 +2,7 @@
   "namespace": "com.comcast.kestrel.odp.event",
   "name": "InterfaceDevicesWifi",
   "type": "record",
-  "doc": "Contains a list of zero of more reports for each device connected to a moca interface. Each report contains interface status and L2 counters",
+  "doc": "Contains a list of zero or more reports for each device connected to a WiFi interface. Each report contains interface status and L2 counters",
   "fields": [
     {
       "name": "header",
@@ -116,7 +116,7 @@
                       "null",
                       "com.comcast.kestrel.datatype.MacAddress"
                     ],
-                    "doc": "MAC address of the conected device the report is related to",
+                    "doc": "MAC address of the connected device the report is related to",
                     "default": null
                   },
                   {
@@ -188,7 +188,8 @@
                             "n",
                             "ac",
                             "ax",
-                            "be"
+                            "be",
+                            "UNKNOWN"
                           ],
                           "type": "enum"
                         }
@@ -234,7 +235,7 @@
                           "type": "enum"
                         }
                       ],
-                      "doc": "802.11 frequency band in use by interface [TR-181: Device.Wifi.Radio.{i}.OperatingFrequencyBand]",
+                      "doc": "802.11 frequency band in use by interface [TR-181: Device.WiFi.Radio.{i}.OperatingFrequencyBand]",
                       "default": null
                     },
                     {
@@ -253,6 +254,24 @@
                         "string"
                       ],
                       "doc": "SSID name associated with this interface [TR-181: Device.WiFi.SSID.{i}.SSID]",
+                      "default": null
+                    },
+                    {
+                      "name": "mld_enable",
+                      "type": [
+                        "null",
+                        "boolean"
+                      ],
+                      "doc": "Indicates whether MLO is enabled for this device",
+                      "default": null
+                    },
+                    {
+                      "name": "association_link",
+                      "type": [
+                        "null",
+                        "boolean"
+                      ],
+                      "doc": "Indicates whether this is the association/primary link for the MLO connection. True for the main radio link, false for auxiliary links",
                       "default": null
                     }
                   ]
@@ -322,7 +341,7 @@
                         "items": "string",
                         "type": "array"
                       },
-                      "doc": "Array of possible interference soruces as detected by the access point. [TR-181: Device.WiFi.AccessPoint.{i}.AssociatedDevice.{i}.X_COMCAST-COM_InterferenceSources]"
+                      "doc": "Array of possible interference sources as detected by the access point. [TR-181: Device.WiFi.AccessPoint.{i}.AssociatedDevice.{i}.X_COMCAST-COM_InterferenceSources]"
                     },
                     {
                       "name": "rx_rate",
