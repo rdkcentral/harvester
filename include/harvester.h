@@ -27,10 +27,12 @@
 #if (defined SIMULATION)
 #define NEIGHBORHOOD_SCAN_AVRO_FILENAME		"GatewayAccessPointNeighborScanReport.avsc"
 #define INTERFACE_DEVICES_WIFI_AVRO_FILENAME		"InterfaceDevicesWifi.avsc"
+#define INTERFACE_DEVICES_WIFI_MLO_AVRO_FILENAME	"InterfaceDevicesWifiMLO.avsc"
 #define RADIO_INTERFACE_STATS_AVRO_FILENAME		"RadioInterfacesStatistics.avsc"
 #else
 #define NEIGHBORHOOD_SCAN_AVRO_FILENAME		"/usr/ccsp/harvester/GatewayAccessPointNeighborScanReport.avsc"
 #define INTERFACE_DEVICES_WIFI_AVRO_FILENAME		"/usr/ccsp/harvester/InterfaceDevicesWifi.avsc"
+#define INTERFACE_DEVICES_WIFI_MLO_AVRO_FILENAME	"/usr/ccsp/harvester/InterfaceDevicesWifiMLO.avsc"
 #define RADIO_INTERFACE_STATS_AVRO_FILENAME		"/usr/ccsp/harvester/RadioInterfacesStatistics.avsc"
 #endif
 #define CHK_AVRO_ERR (strlen(avro_strerror()) > 0)
