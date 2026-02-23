@@ -28,8 +28,10 @@
 
 extern char *buffer;
 extern char *idw_schemaidbuffer;
+extern char *idw_MLOschemaidbuffer;
 extern void* iface;
 extern bool schema_file_parsed;
+extern bool g_isMLORfcEnabled;
 
 extern SyscfgMock * g_syscfgMock;
 extern SafecLibMock* g_safecLibMock;
@@ -70,7 +72,7 @@ TEST_F(HarvesterTestFixture, GetIDWSchemaBufferSize) {
 }
 
 TEST_F(HarvesterTestFixture, GetIDWSchemaIDBuffer) {
-
+    g_isMLORfcEnabled = false;
     idw_schemaidbuffer = (char*)malloc(64 * sizeof(char));
     strcpy(idw_schemaidbuffer, "Test Buffer Content");
 
@@ -83,7 +85,29 @@ TEST_F(HarvesterTestFixture, GetIDWSchemaIDBuffer) {
     idw_schemaidbuffer = nullptr;  
 }
 
+TEST_F(HarvesterTestFixture, GetIDWSchemaIDBuffer_WhenMLORfcEnabled)
+{
+    // Arrange
+    g_isMLORfcEnabled = true;
+
+    idw_MLOschemaidbuffer = (char*)malloc(64);
+    ASSERT_NE(idw_MLOschemaidbuffer, nullptr);
+    strcpy(idw_MLOschemaidbuffer, "MLO Buffer Content");
+
+    // Act
+    char* returnedBuffer = GetIDWSchemaIDBuffer();
+
+    // Assert
+    ASSERT_NE(returnedBuffer, nullptr);
+    EXPECT_STREQ(returnedBuffer, "MLO Buffer Content");
+
+    // Cleanup
+    free(idw_MLOschemaidbuffer);
+    idw_MLOschemaidbuffer = nullptr;
+}
+
 TEST_F(HarvesterTestFixture, GetIDWSchemaIDBufferSize) {
+    g_isMLORfcEnabled = false;   
 
     idw_schemaidbuffer = (char*)malloc(64 * sizeof(char));
     ASSERT_NE(idw_schemaidbuffer, nullptr);
@@ -94,6 +118,21 @@ TEST_F(HarvesterTestFixture, GetIDWSchemaIDBufferSize) {
 
     free(idw_schemaidbuffer);
     idw_schemaidbuffer = nullptr;  
+}
+
+TEST_F(HarvesterTestFixture, GetIDWSchemaIDBufferSize_WhenMLORfcEnabled) {
+    g_isMLORfcEnabled = true;   
+
+    idw_MLOschemaidbuffer = (char*)malloc(64 * sizeof(char));
+    ASSERT_NE(idw_MLOschemaidbuffer, nullptr);
+    strcpy(idw_MLOschemaidbuffer, "Test Buffer Content");
+
+    int size = GetIDWSchemaIDBufferSize();
+    EXPECT_EQ(size, 19);
+
+    free(idw_MLOschemaidbuffer);
+    idw_MLOschemaidbuffer = nullptr;
+    g_isMLORfcEnabled = false;     
 }
 
 TEST_F(HarvesterTestFixture, NumberofElementsinLinkedList) {
@@ -155,4 +194,3 @@ TEST_F(HarvesterTestFixture, harvester_avro_cleanup) {
     EXPECT_EQ(iface, nullptr);
     EXPECT_EQ(schema_file_parsed, false);
 }
-
