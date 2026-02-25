@@ -339,6 +339,9 @@ TEST_F(HarvesterTestFixture, TestSuccessfulDataRetrieval) {
 
     int ret = GetRadioNeighboringAPData(radioIndex, radioIfName);
     EXPECT_EQ(ret, 0);  
+
+    // Free allocated memory to avoid leaks
+    free(neighbor_ap_array);
 }
 
 
