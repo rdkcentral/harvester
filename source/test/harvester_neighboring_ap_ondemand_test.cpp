@@ -81,7 +81,7 @@ TEST_F(HarvesterTestFixture, iTestSuccessfulDataRetrieval) {
     BOOL enabled = TRUE;
     ULONG channel = 6;
     char freqband[] = "2.4GHz";
-    wifi_neighbor_ap2_t *neighbor_ap_array = (wifi_neighbor_ap2_t *)calloc(1, sizeof(wifi_neighbor_ap2_t));
+    wifi_neighbor_ap2_t neighbor_ap_array[1];
     UINT array_size = 1;
 
     
@@ -107,8 +107,8 @@ TEST_F(HarvesterTestFixture, iTestSuccessfulDataRetrieval) {
     int ret = GetRadioNeighboringAPOnDemandData(radioIndex, radioIfName);
     EXPECT_EQ(ret, 0);  
     
-    // Free allocated memory to avoid leaks
-    free(neighbor_ap_array);
+    /** //Free allocated memory to avoid leaks
+    free(neighbor_ap_array);**/
 }
 
 
