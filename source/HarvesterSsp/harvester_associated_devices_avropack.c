@@ -174,11 +174,11 @@ avro_writer_t prepare_writer()
     /* open schema file */
     if(g_isMLORfcEnabled == false)
     {
-      CcspHarvesterTrace(("RDK_LOG_INFO, MLO RFC disabled, opening avro file: %s\n",INTERFACE_DEVICES_WIFI_AVRO_FILENAME));
+      CcspHarvesterTrace(("RDK_LOG_INFO, opening avro file: %s\n",INTERFACE_DEVICES_WIFI_AVRO_FILENAME));
       fp = fopen ( INTERFACE_DEVICES_WIFI_AVRO_FILENAME , "rb" );
       if ( !fp )
       {
-        CcspHarvesterTrace(("RDK_LOG_ERROR, MLO RFC disabled, Failed to open avro file : %s\n",INTERFACE_DEVICES_WIFI_AVRO_FILENAME));
+        CcspHarvesterTrace(("RDK_LOG_ERROR, Failed to open avro file : %s\n",INTERFACE_DEVICES_WIFI_AVRO_FILENAME));
         perror( INTERFACE_DEVICES_WIFI_AVRO_FILENAME " doesn't exist."), exit(1);
       }
     }
