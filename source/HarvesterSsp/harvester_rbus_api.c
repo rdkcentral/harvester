@@ -1058,12 +1058,20 @@ int set_HarvesterMLORfcEnable(bool bValue)
         free(buf);
         return 1;
     }
-    CcspHarvesterTrace(("RDK_LOG_INFO, %s: PSM set success for parameter %s and value %s\n", __FUNCTION__, HARVESTER_MLO_RFC_PARAM, buf));
+    CcspHarvesterTrace(("RDK_LOG_DEBUG, %s: PSM set success for parameter %s and value %s\n", __FUNCTION__, HARVESTER_MLO_RFC_PARAM, buf));
 
     /* Update global MLO RFC variable under mutex to avoid data races */
     pthread_mutex_lock(&mlorfc_mut);
     g_MLORfcEnabled = bValue;
     pthread_mutex_unlock(&mlorfc_mut);
+    if(bValue == true)
+    {
+        CcspHarvesterTrace(("RDK_LOG_INFO, Harvester MLO RFC is enabled\n"));
+    }
+    else
+    {
+        CcspHarvesterTrace(("RDK_LOG_INFO, Harvester MLO RFC is disabled\n"));
+    }
     free(buf);
     return 0;
 }
@@ -1201,7 +1209,7 @@ int regHarvesterDataModel()
         return -1;
     }
 
-    CcspHarvesterTrace(("RDK_LOG_INFO, %s: Registering MLO RFC parameter %s\n", __FUNCTION__, HARVESTER_MLO_RFC_PARAM));
+    CcspHarvesterTrace(("RDK_LOG_DEBUG, %s: Registering MLO RFC parameter %s\n", __FUNCTION__, HARVESTER_MLO_RFC_PARAM));
 
     rbusDataElement_t dataElements[1] = {
       {HARVESTER_MLO_RFC_PARAM, RBUS_ELEMENT_TYPE_PROPERTY, {harvesterMLO_RfcGetHandler, harvesterMLO_RfcSetHandler, NULL, NULL, NULL, NULL}}
