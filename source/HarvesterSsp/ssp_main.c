@@ -187,13 +187,13 @@ int  cmd_dispatch(int  command)
                         set_HarvesterMLORfcEnable(false);
                     }
                     free(tmpchar);
-                    CcspHarvesterTrace(("RDK_LOG_INFO, %s: Loaded MLO RFC value from PSM = %d\n", __FUNCTION__, get_HarvesterMLORfcEnable()));
+                    CcspHarvesterTrace(("RDK_LOG_DEBUG, %s: Loaded MLO RFC value from PSM = %d\n", __FUNCTION__, get_HarvesterMLORfcEnable()));
                  }
                  else
                  {
                     /* Default to false if PSM value doesn't exist */
                     set_HarvesterMLORfcEnable(false);
-                    CcspHarvesterTrace(("RDK_LOG_INFO, %s: MLO RFC PSM value not found, defaulting to false\n", __FUNCTION__));
+                    CcspHarvesterTrace(("RDK_LOG_DEBUG, %s: MLO RFC PSM value not found, defaulting to false\n", __FUNCTION__));
                  }
                 }
         #endif
