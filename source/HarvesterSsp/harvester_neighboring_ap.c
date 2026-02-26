@@ -496,7 +496,13 @@ int GetRadioNeighboringAPData(int radioIndex, char* radioIfName)
     else
     {
         CcspHarvesterTrace(("RDK_LOG_ERROR, Harvester %s : wifi_getNeighboringWiFiDiagnosticResult2 Return[%d] array_size [%d] \n", __FUNCTION__, ret, array_size));
-    } 
+        // Free the array if it was allocated but not added to the list
+        if (neighbor_ap_array)
+        {
+            free(neighbor_ap_array);
+            neighbor_ap_array = NULL;
+        }
+    }
 
     CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Harvester %s EXIT \n", __FUNCTION__ ));
     return ret;
