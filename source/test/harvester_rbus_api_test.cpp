@@ -318,3 +318,92 @@ TEST_F(HarvesterTestFixture, RbusGetUInt32Value_Success) {
     EXPECT_EQ(result, 0); 
     EXPECT_EQ(value, expectedValue); 
 }
+
+// Test cases for rbus_GetValueFromPsmDB
+TEST_F(HarvesterTestFixture, RbusGetValueFromPsmDB_NotInitialized) {
+    char *paramValue = NULL;
+    char paramName[] = "Device.DeviceInfo.X_RDKCENTRAL-COM_Report.InterfaceDevicesWifi.MloRfcEnable";
+    rbus_handle = NULL;
+
+    EXPECT_CALL(*g_anscDebugMock, Ccsplog3(_, _)).Times(AnyNumber());
+
+    int result = rbus_GetValueFromPsmDB(paramName, &paramValue);
+
+    EXPECT_EQ(result, 1);
+}
+
+TEST_F(HarvesterTestFixture, RbusGetValueFromPsmDB_InvokeFailure) {
+    char *paramValue = NULL;
+    char paramName[] = "Device.DeviceInfo.X_RDKCENTRAL-COM_Report.InterfaceDevicesWifi.MloRfcEnable";
+    rbus_handle = reinterpret_cast<rbusHandle_t>(0x1234);
+
+    EXPECT_CALL(*g_rbusMock, rbusObject_Init(_, _)).WillRepeatedly(Return((rbusObject_t)0x1));
+    EXPECT_CALL(*g_rbusMock, rbusValue_Init(_)).WillRepeatedly(Return((rbusValue_t)0x2));
+    EXPECT_CALL(*g_rbusMock, rbusValue_SetString(_, _)).WillRepeatedly(Return());
+    EXPECT_CALL(*g_rbusMock, rbusObject_SetValue(_, _, _)).WillRepeatedly(Return());
+    EXPECT_CALL(*g_rbusMock, rbusValue_Release(_)).WillRepeatedly(Return());
+    EXPECT_CALL(*g_rbusMock, rbusObject_Release(_)).WillRepeatedly(Return());
+    EXPECT_CALL(*g_anscDebugMock, Ccsplog3(_, _)).Times(AnyNumber());
+
+    EXPECT_CALL(*g_rbusMock, rbusMethod_Invoke(rbus_handle, StrEq("GetPSMRecordValue()"), _, _))
+        .WillOnce(Return(RBUS_ERROR_BUS_ERROR));
+
+    int result = rbus_GetValueFromPsmDB(paramName, &paramValue);
+
+    EXPECT_EQ(result, 1);
+}
+
+TEST_F(HarvesterTestFixture, RbusGetValueFromPsmDB_Success) {
+    char *paramValue = NULL;
+    char paramName[] = "Device.DeviceInfo.X_RDKCENTRAL-COM_Report.InterfaceDevicesWifi.MloRfcEnable";
+    char expectedValueStr[] = "true";
+    rbus_handle = reinterpret_cast<rbusHandle_t>(0x1234);
+    rbusObject_t outParams = (rbusObject_t)0x5555;
+    rbusProperty_t prop = (rbusProperty_t)0x6666;
+    rbusValue_t val = (rbusValue_t)0x7777;
+
+    EXPECT_CALL(*g_rbusMock, rbusObject_Init(_, _)).WillRepeatedly(Return((rbusObject_t)0x1));
+    EXPECT_CALL(*g_rbusMock, rbusValue_Init(_)).WillRepeatedly(Return((rbusValue_t)0x2));
+    EXPECT_CALL(*g_rbusMock, rbusValue_SetString(_, _)).WillRepeatedly(Return());
+    EXPECT_CALL(*g_rbusMock, rbusObject_SetValue(_, _, _)).WillRepeatedly(Return());
+    EXPECT_CALL(*g_rbusMock, rbusValue_Release(_)).WillRepeatedly(Return());
+    EXPECT_CALL(*g_anscDebugMock, Ccsplog3(_, _)).Times(AnyNumber());
+
+    EXPECT_CALL(*g_rbusMock, rbusMethod_Invoke(rbus_handle, StrEq("GetPSMRecordValue()"), _, _))
+        .WillOnce(DoAll(SetArgPointee<3>(outParams), Return(RBUS_ERROR_SUCCESS)));
+
+    EXPECT_CALL(*g_rbusMock, rbusObject_GetProperties(outParams)).WillOnce(Return(prop));
+    EXPECT_CALL(*g_rbusMock, rbusProperty_GetValue(prop)).WillOnce(Return(val));
+    EXPECT_CALL(*g_rbusMock, rbusValue_ToString(val, NULL, 0)).WillOnce(Return(expectedValueStr));
+    EXPECT_CALL(*g_rbusMock, rbusProperty_GetName(prop)).WillOnce(Return("Value"));
+    EXPECT_CALL(*g_rbusMock, rbusProperty_GetNext(prop)).WillOnce(Return((rbusProperty_t)NULL));
+
+    EXPECT_CALL(*g_rbusMock, rbusObject_Release(outParams)).WillOnce(Return());
+    EXPECT_CALL(*g_rbusMock, rbusObject_Release((rbusObject_t)0x1)).WillOnce(Return());
+
+    int result = rbus_GetValueFromPsmDB(paramName, &paramValue);
+
+    EXPECT_EQ(result, 0);
+    EXPECT_STREQ(paramValue, expectedValueStr);
+    
+    if(paramValue) free(paramValue);
+}
+
+TEST_F(HarvesterTestFixture, RegHarvesterDataModel_Success)
+{
+    // Arrange
+    rbus_handle = reinterpret_cast<rbusHandle_t>(0x1234);
+
+    EXPECT_CALL(*g_rbusMock,
+                rbus_regDataElements(rbus_handle, 1, _))
+        .WillOnce(Return(RBUS_ERROR_SUCCESS));
+
+    EXPECT_CALL(*g_anscDebugMock, Ccsplog3(_, _))
+        .Times(::testing::AnyNumber());
+
+    // Act
+    int result = regHarvesterDataModel();
+
+    // Assert
+    EXPECT_EQ(result, 0);
+}
