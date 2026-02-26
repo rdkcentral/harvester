@@ -690,6 +690,12 @@ int GetWiFiApGetAssocDevicesData(int ServiceType, int wlanIndex, char* pSsid)
     else
     {
         CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Harvester %s : wifi_getApAssociatedDeviceDiagnosticResult Return[%d] array_size [%d] \n",__FUNCTION__, ret, array_size));
+        // Free the allocated array if it's not NULL to prevent memory leak
+        if (wifi_associated_dev_array != NULL)
+        {
+            free(wifi_associated_dev_array);
+            wifi_associated_dev_array = NULL;
+        }
     } 
 
     CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Harvester %s EXIT \n", __FUNCTION__ ));
