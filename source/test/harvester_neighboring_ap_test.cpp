@@ -314,10 +314,10 @@ TEST_F(HarvesterTestFixture, TestSuccessfulDataRetrieval) {
     BOOL enabled = TRUE;
     ULONG channel = 6;
     char freqband[] = "2.4GHz";
-    wifi_neighbor_ap2_t neighbor_ap_array[1];
+    wifi_neighbor_ap2_t neighbor_ap_array[1];  
     UINT array_size = 1;
 
-
+    
     EXPECT_CALL(*g_WifiHalMock, wifi_getRadioEnable(radioIndex, testing::_))
         .WillOnce(testing::DoAll(testing::SetArgPointee<1>(enabled), testing::Return(0)));
 
@@ -330,15 +330,15 @@ TEST_F(HarvesterTestFixture, TestSuccessfulDataRetrieval) {
     EXPECT_CALL(*g_WifiHalMock, wifi_getNeighboringWiFiDiagnosticResult2(radioIndex, testing::_, testing::_))
         .WillOnce(testing::DoAll(testing::SetArgPointee<1>(neighbor_ap_array), testing::SetArgPointee<2>(array_size), testing::Return(0)));
 
-
+    
     EXPECT_CALL(*g_securewrapperMock, v_secure_popen(_, _, _))
-        .WillRepeatedly(testing::Return(nullptr));
+        .WillRepeatedly(testing::Return(nullptr)); 
 
     EXPECT_CALL(*g_anscDebugMock, Ccsplog3(_, _))
-        .WillRepeatedly(testing::Return());
+        .WillRepeatedly(testing::Return()); 
 
     int ret = GetRadioNeighboringAPData(radioIndex, radioIfName);
-    EXPECT_EQ(ret, 0);
+    EXPECT_EQ(ret, 0);  
 }
 
 
