@@ -47,6 +47,18 @@
            }
       },
       {
+        "name": "Utopia",
+        "repo": "https://github.com/rdkcentral/utopia.git",
+        "branch": "develop",
+        "header_paths": [
+          { "source": "source/include/syscfg", "destination": "$HOME/usr/include/rdkb/syscfg" }
+        ],
+        "build": {
+          "type": "script",
+          "script": "build_tools_workflows/cov_docker_script/common_external_build.sh"
+        }
+      },
+      {
         "name": "libSyscallWrapper",
         "repo": "https://github.com/rdkcentral/libSyscallWrapper.git",
         "branch": "develop",
