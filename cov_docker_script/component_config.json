@@ -31,6 +31,17 @@
         ]
       },
       {
+        "name": "hardware-abstraction-layer",
+        "repo": "https://github.com/rdkcentral/hardware-abstraction-layer.git",
+        "branch": "develop",
+        "header_paths": [
+          {
+            "source": "source/wifi",
+            "destination": "$HOME/usr/include/rdkb"
+          }
+        ]
+      },
+      {
          "name": "common-library",
          "repo": "https://github.com/rdkcentral/common-library.git",
          "branch": "develop",
