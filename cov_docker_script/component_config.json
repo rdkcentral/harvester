@@ -154,6 +154,10 @@
       {
         "description": "Generate dm_pack_datamodel.c from XML",
         "command": "python3 $HOME/usr/include/rdkb/dm_pack_code_gen.py config-atom/Harvester.XML source/HarvesterSsp/dm_pack_datamodel.c"
+      },
+      {
+        "description": "Patch Makefile libdir to absolute path (fixes libtool rpath error)",
+        "command": "find . -name Makefile | xargs sed -i 's|libdir = ${exec_prefix}/lib|libdir = /home/rdkb_test01/usr/local/lib|g'"
       }
     ],
     "build": {
@@ -163,3 +167,4 @@
     }
   }
 }
+
