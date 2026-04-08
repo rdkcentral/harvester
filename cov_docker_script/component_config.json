@@ -158,7 +158,8 @@
     ],
     "build": {
       "type": "autotools",
-      "configure_options_file": "cov_docker_script/configure_options.conf"
+      "configure_options_file": "cov_docker_script/configure_options.conf",
+      "configure_options": "--libdir=$HOME/usr/local/lib --prefix=$HOME/usr --enable-rdkOneWifi"
     }
   }
 }
