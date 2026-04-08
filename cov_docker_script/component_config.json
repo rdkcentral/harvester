@@ -31,6 +31,17 @@
         ]
       },
       {
+        "name": "gmock-broadband",
+        "repo": "https://github.com/rdkcentral/gmock-broadband.git",
+        "branch": "develop",
+        "header_paths": [
+          {
+            "source": "docker_scripts/common_headers",
+            "destination": "$HOME/usr/include/rdkb"
+          }
+        ]
+      },
+      {
         "name": "hal",
         "repo": "https://github.com/rdkcentral/hardware-abstraction-layer.git",
         "branch": "develop",
@@ -143,17 +154,11 @@
       {
         "description": "Generate dm_pack_datamodel.c from XML",
         "command": "python3 $HOME/usr/include/rdkb/dm_pack_code_gen.py config-atom/Harvester.XML source/HarvesterSsp/dm_pack_datamodel.c"
-      },
-      {
-        "description": "Patch Makefile libdir to absolute path (fixes libtool rpath error)",
-        "command": "find . -name Makefile | xargs sed -i 's|libdir = ${exec_prefix}/lib|libdir = /home/rdkb_test01/usr/local/lib|g'"
       }
     ],
     "build": {
       "type": "autotools",
-      "configure_options_file": "cov_docker_script/configure_options.conf",
-      "configure_options": "--libdir=/home/rdkb_test01/usr/local/lib --prefix=/home/rdkb_test01/usr --enable-rdkOneWifi"
+      "configure_options_file": "cov_docker_script/configure_options.conf"
     }
   }
 }
-
