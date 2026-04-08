@@ -39,7 +39,7 @@
           "commands": [
             "./autogen.sh",
             "./configure",
-            "make -C source/wifi CPPFLAGS=\"-I$HOME/usr/include/rdkb\" LDFLAGS=\"-L$HOME/usr/local/lib\""
+            "make -C source/wifi CPPFLAGS=\"-I$HOME/usr/include/rdkb -I$HOME/usr/include/rdkb/wifi\" LDFLAGS=\"-L$HOME/usr/local/lib\""
           ]
         }
       },
