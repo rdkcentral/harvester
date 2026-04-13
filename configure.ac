@@ -58,7 +58,7 @@ AC_ARG_ENABLE([core_net_lib_feature_support],
 esac],[core_net_lib_feature_support=false])
 AM_CONDITIONAL(CORE_NET_LIB_FEATURE_SUPPORT, test x"$core_net_lib_feature_support" = x"true")
 
-AC_PREFIX_DEFAULT(`pwd`)
+AC_PREFIX_DEFAULT(pwd)
 AC_ENABLE_SHARED
 AC_DISABLE_STATIC
 
