@@ -28,7 +28,7 @@ INCPATH += $(CCSP_ROOT_DIR)/Harvester/source/HarvesterSsp/
 INCPATH += $(CCSP_ROOT_DIR)/Harvester/include/
 
 CFLAGS += $(addprefix -I, $(INCPATH))
-CFLAGS += -Wall
+CFLAGS += -Wall -Wno-error=format
 
 LDFLAGS+= -lccsp_common -lm -lpthread -lHarvesterSsp -lavro -lhal_wifi -lmsgpack -lbase64
 

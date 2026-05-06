@@ -22,6 +22,7 @@ harvester_SOURCES = harvester.c
 
 harvester_LDADD = ${top_builddir}/source/HarvesterSsp/libHarvesterSsp.la
 harvester_CFLAGS = -I${top_srcdir}/include
+harvester_CFLAGS += -Wall -Wno-error=format
 
 if RDK_ONEWIFI
 harvester_CFLAGS += -I${top_srcdir}/source/HarvesterSsp

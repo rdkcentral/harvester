@@ -47,7 +47,7 @@ int main(int argc, char* argv[])
         if ((!ind) && (rc == EOK))
         {
            consoleDebugEnable = 1;
-           fprintf(debugLogFile, "DEBUG ENABLE ON \n");
+           fprintf(debugLogFile, "DEBUG ENABLE ON %s \n");
         }
         else
         {
