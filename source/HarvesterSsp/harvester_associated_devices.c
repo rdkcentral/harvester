@@ -878,8 +878,8 @@ void* StartAssociatedDeviceHarvesting( void *arg )
         else
         {
             CcspHarvesterTrace(("RDK_LOG_DEBUG, wifi_getSSIDNumberOfEntries Error [%d] or No SSID [%ld] \n", ret, output));
-            CcspHarvesterTrace(("RDK_LOG_ERROR, Harvester %s : Sleeping for 5 seconds before retrying\n", __FUNCTION__));
-            sleep(5); // Sleep for 5sec's time before retrying in case of error or no SSID, to avoid CPU load/busy looping.            
+            // CcspHarvesterTrace(("RDK_LOG_ERROR, Harvester %s : Sleeping for 5 seconds before retrying\n", __FUNCTION__));
+            // sleep(5); // Sleep for 5sec's time before retrying in case of error or no SSID, to avoid CPU load/busy looping.            
         }
 
         CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG,GetIDWPollingPeriod[%ld]\n", GetIDWPollingPeriod()));
