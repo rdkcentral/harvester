@@ -295,8 +295,7 @@ void harvester_report_associateddevices(struct associateddevicedata *head, char*
   size_t strsize6GHZ = 0;
 #endif
 #ifdef RDK_ONEWIFI  
-  wifi_mlo_associated_dev_t *mlo_ps = NULL;
-  size_t skippedDevices = 0;  
+  wifi_mlo_associated_dev_t *mlo_ps = NULL; 
 #endif
 
   CcspHarvesterConsoleTrace(("RDK_LOG_DEBUG, Harvester %s : ENTER \n", __FUNCTION__ ));
@@ -505,15 +504,6 @@ void harvester_report_associateddevices(struct associateddevicedata *head, char*
       {
           CcspHarvesterTrace(("RDK_LOG_ERROR, Harvester %s: mlo_ps is NULL for frequency_band=%s, skipping avro processing\n", __FUNCTION__, ptr->radioOperatingFrequencyBand));
           continue;
-      }
-
-      // Skip processing MLD clients if Harvester MLO RFC feature is turned off
-      if((g_isMLORfcEnabled == false) && (mlo_ps->isMLDEnabled == true))
-      {
-        pMac = (unsigned char*)ps->cli_MACAddress;
-        CcspHarvesterTrace(("RDK_LOG_INFO, Harvester MLO RFC disabled; skipped avro pack for frequency_band=%s, mac_address=0x%02X:0x%02X:0x%02X:0x%02X:0x%02X:0x%02X\n", ptr->radioOperatingFrequencyBand, pMac[0], pMac[1], pMac[2], pMac[3], pMac[4], pMac[5]));
-        skippedDevices++;
-        continue;
       }
 #else
     for (j = 0, ps = ptr->devicedata; j < ptr->numAssocDevices; j++, ps++)
@@ -944,8 +934,7 @@ void harvester_report_associateddevices(struct associateddevicedata *head, char*
 
     }
 #ifdef RDK_ONEWIFI    
-    CcspHarvesterTrace(("RDK_LOG_INFO,Total number of associated devices connected to %s radio = %lu, Number of associated devices data packed for sending = %lu\n", ptr->radioOperatingFrequencyBand, ptr->numAssocDevices,ptr->numAssocDevices-skippedDevices));
-    skippedDevices = 0; // reset skipped device count for next radio
+    CcspHarvesterTrace(("RDK_LOG_INFO,Total number of associated devices connected to %s radio = %lu\n", ptr->radioOperatingFrequencyBand,ptr->numAssocDevices));
 #endif
     ptr = ptr->next; // next link list
 
