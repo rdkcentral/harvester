@@ -91,6 +91,86 @@ extern ANSC_STATUS SetIDWPollingPeriodInNVRAM(ULONG pPollingVal);
 extern ANSC_STATUS SetIDWReportingPeriodInNVRAM(ULONG pReportingVal);
 extern void harvester_avro_cleanup();
 
+/* ============================================================================
+ * COVERITY TEST SECTION - Intentional defects for integration testing
+ * DO NOT USE IN PRODUCTION - Remove after Coverity verification
+ * ============================================================================ */
+
+/* HIGH RISK: CWE-122 Buffer Overflow - OVERRUN */
+static void coverity_high_buffer_overflow(const char *input)
+{
+    char buffer[10];
+    strcpy(buffer, input);  /* COVERITY HIGH: OVERRUN */
+    printf("Buffer: %s\n", buffer);
+}
+
+/* HIGH RISK: CWE-476 NULL Pointer Dereference - FORWARD_NULL */
+static int coverity_high_null_deref(int flag)
+{
+    int *ptr = NULL;
+    if (flag > 0) {
+        ptr = (int *)malloc(sizeof(int));
+    }
+    *ptr = 42;  /* COVERITY HIGH: FORWARD_NULL */
+    return *ptr;
+}
+
+/* HIGH RISK: CWE-401 Memory Leak - RESOURCE_LEAK */
+static int coverity_high_memory_leak(int size)
+{
+    int *arr = (int *)malloc(size * sizeof(int));
+    if (size > 100) {
+        return -1;  /* COVERITY HIGH: RESOURCE_LEAK */
+    }
+    free(arr);
+    return 0;
+}
+
+/* MEDIUM RISK: CWE-457 Uninitialized Variable - UNINIT */
+static int coverity_medium_uninit_var(int cond)
+{
+    int result;
+    if (cond > 10) {
+        result = cond * 2;
+    }
+    return result;  /* COVERITY MEDIUM: UNINIT */
+}
+
+/* MEDIUM RISK: CWE-775 File Handle Leak - RESOURCE_LEAK */
+static int coverity_medium_file_leak(const char *fname)
+{
+    FILE *fp = fopen(fname, "r");
+    if (fp == NULL) return -1;
+    char buf[64];
+    if (fgets(buf, sizeof(buf), fp) == NULL) {
+        return -2;  /* COVERITY MEDIUM: RESOURCE_LEAK */
+    }
+    fclose(fp);
+    return 0;
+}
+
+/* LOW RISK: Dead Code - DEADCODE */
+static int coverity_low_dead_code(int val)
+{
+    if (val > 0) return val;
+    else return -val;
+    printf("Unreachable\n");  /* COVERITY LOW: DEADCODE */
+    return 0;
+}
+
+/* LOW RISK: Redundant Condition - CONSTANT_EXPRESSION_RESULT */
+static int coverity_low_redundant_cond(unsigned int val)
+{
+    if (val >= 0) {  /* COVERITY LOW: always true for unsigned */
+        return 1;
+    }
+    return 0;
+}
+
+/* ============================================================================
+ * END COVERITY TEST SECTION
+ * ============================================================================ */
+
 bool g_isMLORfcEnabled = false;
 char* GetCurrentTimeString()
 {
